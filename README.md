@@ -1,3 +1,16 @@
+# Edoki unity purchasing
+This fork contian our custom change to the package com.unity.purchasing.  
+* We have changed the ios module to support Discount.  
+* We send the price localisation.  
+
+Search for Edoki and you will find our change.  
+
+## These file where change
+* UnityEarlyTransactionObserver.mm
+* UnityPurchasing.m
+
+Unity readme
+---
 # About In App Purchasing
 
 Unity In App Purchasing, setting up in-app purchases for your game across multiple app stores has never been easier.
