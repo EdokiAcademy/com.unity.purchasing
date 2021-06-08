@@ -244,6 +244,32 @@ int delayInSeconds = 2;
                     //payment.applicationUsername = _applicationUsername;
                 }
             }
+            
+///////////////////////////////////// Edoki custom change start here /////////////////////////////////////
+// this are the line to set a discount when buying a subscription. data are set in UnityEarlyTransactionObserver.mm
+            if (@available(iOS 12.2, *))
+            {
+               if([[NSUserDefaults standardUserDefaults] objectForKey:@"DiscountIdentifier"] != nil)
+               {
+                   NSString *identifier = [[NSUserDefaults standardUserDefaults] objectForKey:@"DiscountIdentifier"];
+                   NSString *keyIdentifier = [[NSUserDefaults standardUserDefaults] objectForKey:@"DiscountKeyIdentifier"];
+                   NSString *nonceString = [[NSUserDefaults standardUserDefaults] objectForKey:@"DiscountNonce"];
+                   NSString *signature = [[NSUserDefaults standardUserDefaults] objectForKey:@"DiscountSignature"];
+                   NSString *timestamp = [[NSUserDefaults standardUserDefaults] objectForKey:@"DiscountTimestamp"];
+                   const char *cTimestamp = [timestamp cStringUsingEncoding:NSASCIIStringEncoding];
+                   const char *cNonce = [nonceString cStringUsingEncoding:NSASCIIStringEncoding];
+                   
+                   NSNumberFormatter *format = [[NSNumberFormatter alloc] init];
+                   format.numberStyle = NSNumberFormatterNoStyle;
+                   NSNumber* timestampNumber = [format numberFromString:[NSString stringWithUTF8String:cTimestamp]];
+                   
+                   NSUUID *nonce = [[NSUUID alloc] initWithUUIDString:[NSString stringWithUTF8String:cNonce]];
+                   
+                   payment.applicationUsername = @"Montessori";
+                   payment.paymentDiscount = [[SKPaymentDiscount alloc] initWithIdentifier:identifier keyIdentifier:keyIdentifier nonce:nonce signature:signature timestamp:timestampNumber];
+               }
+            }
+///////////////////////////////////// Edoki custom change end here /////////////////////////////////////
 
             [[SKPaymentQueue defaultQueue] addPayment:payment];
         } else {
@@ -583,6 +609,61 @@ int delayInSeconds = 2;
             NSString *currencyCode = [[product priceLocale] objectForKey:NSLocaleCurrencyCode];
             [metadata setObject:currencyCode forKey:@"isoCurrencyCode"];
         }
+
+///////////////////////////////////// Edoki custom change start here /////////////////////////////////////
+        // Send locale window code to unity
+        NSLocale *locale = [product priceLocale];
+        uint32_t windowsCode = [NSLocale windowsLocaleCodeFromLocaleIdentifier:[locale localeIdentifier]];
+        const char *msgString = [[NSString stringWithFormat: @"%d", windowsCode] cStringUsingEncoding:NSUTF8StringEncoding];
+        UnitySendMessage("IapNativeInterface", "ReceiveWindowsCode", msgString);
+// this code is use to fetch the discount from the app store
+        if(@available(iOS 12_2, *))
+        {
+            NSArray<SKProductDiscount*> *discounts = [product discounts];
+            for(id discount in discounts)
+            {
+                NSString* message = [[product productIdentifier] stringByAppendingString:@"#"];
+                message = [message stringByAppendingString:[discount identifier]];
+                message = [message stringByAppendingString:@"#"];
+                
+                NSString* freePeriod = @"";
+                SKProductSubscriptionPeriod* subPeriod = [discount subscriptionPeriod];
+                if([subPeriod unit] == SKProductPeriodUnitDay) freePeriod = @"Day";
+                if([subPeriod unit] == SKProductPeriodUnitMonth) freePeriod = @"Month";
+                if([subPeriod unit] == SKProductPeriodUnitWeek) freePeriod = @"Week";
+                if([subPeriod unit] == SKProductPeriodUnitYear) freePeriod = @"Year";
+                
+                if([discount paymentMode] == SKProductDiscountPaymentModeFreeTrial)
+                {
+                    message = [message stringByAppendingString:@"FreePeriod#"];
+                    message = [message stringByAppendingString:freePeriod];
+                    message = [message stringByAppendingString:@"#"];
+                    message = [message stringByAppendingString:[[NSString alloc] initWithFormat:@"%lu",(unsigned long)[subPeriod numberOfUnits]]];
+                }
+                else
+                {
+                    NSNumberFormatter *numberFormatter2 = [[NSNumberFormatter alloc] init];
+                    [numberFormatter2 setFormatterBehavior:NSNumberFormatterBehavior10_4];
+                    [numberFormatter2 setNumberStyle:NSNumberFormatterCurrencyStyle];
+                    [numberFormatter2 setLocale:[product priceLocale]];
+                    NSString *formattedString2 = [numberFormatter2 stringFromNumber:[discount price]];
+                    
+                    message = [message stringByAppendingString:@"DiscountPrice#"];
+                    message = [message stringByAppendingString:[[NSString alloc] initWithFormat:@"%@",[discount price]]];
+                    message = [message stringByAppendingString:@"#"];
+                    message = [message stringByAppendingString:formattedString2];
+                    message = [message stringByAppendingString:@"#"];
+                    message = [message stringByAppendingString:freePeriod];
+                    message = [message stringByAppendingString:@"#"];
+                    message = [message stringByAppendingString:[[NSString alloc] initWithFormat:@"%lu",(unsigned long)[discount numberOfPeriods]]];
+                }
+                
+                
+                const char *msgString = [message cStringUsingEncoding:NSUTF8StringEncoding];
+                UnitySendMessage("IapNativeInterface", "ReceivePromotions", msgString);
+            }
+        }
+///////////////////////////////////// Edoki custom change end here /////////////////////////////////////
 
 #if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000 || __TV_OS_VERSION_MAX_ALLOWED >= 110000 || __MAC_OS_X_VERSION_MAX_ALLOWED >= 101300
         if ((@available(iOS 11_2, macOS 10_13_2, tvOS 11_2, *)) && (nil != [product introductoryPrice]))  {
