@@ -82,4 +82,45 @@ static UnityEarlyTransactionObserver *s_Observer = nil;
     }
 }
 
+///////////////////////////////////// Edoki custom change start here /////////////////////////////////////
+extern "C"
+{
+    // user to set some user varible to be use later in UnityPurchasing.m
+    void SetNativeDiscountData(const char *identifier, const char *keyIdentifier, const char *nonce, const char *signature, const char* timestamp)
+    {
+        if (@available(iOS 12.2, *))
+        {
+            Log(@"Discount data set");
+            
+            NSString* identifierString = [NSString stringWithUTF8String:identifier];
+            NSString* keyIdentifierString = [NSString stringWithUTF8String:keyIdentifier];
+            NSString* nonceString = [NSString stringWithUTF8String:nonce];
+            NSString* signatureString = [NSString stringWithUTF8String:signature];
+            NSString* timestampString = [NSString stringWithUTF8String:timestamp];
+            
+            [[NSUserDefaults standardUserDefaults] setObject:identifierString forKey:@"DiscountIdentifier"];
+            [[NSUserDefaults standardUserDefaults] setObject:keyIdentifierString forKey:@"DiscountKeyIdentifier"];
+            [[NSUserDefaults standardUserDefaults] setObject:nonceString forKey:@"DiscountNonce"];
+            [[NSUserDefaults standardUserDefaults] setObject:signatureString forKey:@"DiscountSignature"];
+            [[NSUserDefaults standardUserDefaults] setObject:timestampString forKey:@"DiscountTimestamp"];
+        }
+    }
+    
+    // Remove the data set by SetNativeDiscountData
+    void FlushNativeDiscountData()
+    {
+        if (@available(iOS 12.2, *))
+        {
+            Log(@"Discount data flush");
+            
+            [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"DiscountIdentifier"];
+            [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"DiscountKeyIdentifier"];
+            [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"DiscountNonce"];
+            [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"DiscountSignature"];
+            [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"DiscountTimestamp"];
+        }
+    }
+}
+///////////////////////////////////// Edoki custom change end here /////////////////////////////////////
+
 @end
