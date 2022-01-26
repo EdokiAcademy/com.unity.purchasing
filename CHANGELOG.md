@@ -1,6 +1,136 @@
 # Changelog
+## [4.1.2] - 2021-11-15
+
+### Fixed
+- Various internal obsolete warnings have been removed, allowing the project to be compiled with errors as warnings enabled.
+
+## [4.1.1] - 2021-10-28
+
+### Changed
+- A default store will be selected for each platform. For Android the default store will be Google. All other platforms already had default stores.
+
+## [4.1.0] - 2021-09-20
+
+### Added
+- Apple - Add support for receipt validation with [StoreKit Test](https://developer.apple.com/documentation/Xcode/setting-up-storekit-testing-in-xcode). See the [Receipt Validation Obfuscator manual](https://docs.unity3d.com/Packages/com.unity.purchasing@4.0/manual/UnityIAPValidatingReceipts.html) for a usage recommendation. See also the [sample](https://docs.unity3d.com/Packages/com.unity.purchasing@4.0/manual/Overview.html#learn-more) "05 Local Receipt Validation" for an example.
+- GooglePlay - Add support for controlling automatic fetching of purchases at initialization, with `IGooglePlayConfiguration.SetFetchPurchasesAtInitialize(bool)`. Use to help distinguish previously seen purchases from new purchases. Then to fetch previously seen purchases use `IGooglePlayExtensions.RestorePurchases(Action<bool>)`.
+
+### Changed
+- Menu items for this package were renamed from *Unity IAP -> In-App Purchasing* and have been moved from *Window > Unity IAP* to *Services > In-App Purchasing*.
+- Choosing an Android app store target before building the Android Build Target is now required. A build error will be emitted otherwise. Set this with the Store Selector window (*Services > In-App Purchasing > Switch Store ...*) or the API (`UnityPurchasingEditor.TargetAndroidStore()`). The default Android app store is now AppStore.NotSpecified and is visible in the window as `<Select a targeted store>`. Previously the default app store was the Google Play Store for the Android Build Target. See the [Store Selector documentation](https://docs.unity3d.com/Packages/com.unity.purchasing@4.1/manual/StoreSelector.html) for more
+- Apple - Workaround rare crash seen if `nil` `NSLocaleCurrencyCode` is received when extracting localized currency code from `[SKProduct priceLocale]` when fetching products. Substitutes [ISO Unknown Currency code "XXX"](https://en.wikipedia.org/wiki/ISO_4217#X_currencies) into `ProductMetadata.isoCurrencyCode`.
+- Removed warning log `Already recorded transaction`.
+- Codeless - The default setting for enabling Codeless Auto Initialization in new projects' catalogs is now true instead of false. (As seen in the Catalog Editor as "Automatically initialize UnityPurchasing (recommended)").
+
+### Fixed
+- Fixed warning, missing await for async call in ExponentialRetryPolicy.cs
+
+### Removed
+- Removed the original and complex Unity IAP sample known as "Example", or "IAP Demo". Please use the recently added [samples](https://docs.unity3d.com/Packages/com.unity.purchasing@4.0/manual/Overview.html#learn-more) for a granular introduction to In-App Purchasing features. 
+
+## [4.0.3] - 2021-08-18
+### Added
+- Added samples to the [Package Manager Details view](https://docs.unity3d.com/Manual/upm-ui-details.html):
+  - Apple Sample - Restoring Transactions
+  - Apple Sample - Handling Deferred Purchases
+  - Apple Sample - Detecting Fraud
+  - Apple Sample - Getting Introductory Prices
+  - Apple Sample - Present Code Redemption Sheet
+  - Apple Sample - Can Make Payments
+  - Apple Sample - Retrieving Product Receipts
+  - Apple Sample - Subscription Upgrade Downgrade
+  - Apple Sample - Promoting Products
+- Apple - Added support for fetching the current store promotion order of products on this device with `void IAppleExtensions.FetchStorePromotionOrder(Action<List<Product>> successCallback, Action errorCallback)`
+- Apple - Added support for fetching the current store promotion visibility of a product on this device with `void FetchStorePromotionVisibilitySuccess(Product product, AppleStorePromotionVisibility visibility)`
+
+## Fixed
+- Apple - Fixed issue with unknown products being processed with `NonConsumable` type.
+
+### Fixed
+- GooglePlay - Fixed issue that led to purchases failing with a `ProductUnavailable` error when  fetching additional products multiple times in quick succession.
+- GooglePlay - Fixed issue that led to purchases failing with a `ProductUnavailable` error when a game had been running for some time.
+- GooglePlay - Fixed issue that led to initialization failing with a `NoProductsAvailable` error when the network is interrupted while initializing, requiring the user to restart the app. Now Unity IAP handle initialization with poor network
+  connectivity by retrying periodically. This retry behavior is consistent with our Apple App Store's, and with the previous version of our Google Play Store's implementations.
+
+### Changed
+- Restructured [Manual documentation](https://docs.unity3d.com/Packages/com.unity.purchasing@4.0/manual/index.html) to improve readability.
+
+## [4.0.0] - 2021-07-19
+### Added
+- Codeless Listener method to access the store configuration after initialization. 
+  - `CodelessIAPStoreListener.Instance.GetStoreConfiguration`
+- Several samples to the [Package Manager Details view](https://docs.unity3d.com/Manual/upm-ui-details.html) for com.unity.purchasing:
+  - Fetching additional products
+  - Integrating self-provided backend receipt validation
+  - Local receipt validation
+  - Google Play Store - Upgrade and downgrade subscriptions
+  - Google Play Store - Restoring Transactions
+  - Google Play Store - Confirming subscription price change
+  - Google Play Store - Handling Deferred Purchases
+  - Google Play Store - Fraud detection
+  - Apple App Store - Refreshing app receipts
+- Google Play - `GooglePlayProrationMode` enum that represent Google's proration modes and added `IGooglePlayStoreExtensions.UpgradeDowngradeSubscription` using the enum.
+
+### Fixed
+- GooglePlay - Fixed [Application Not Responding (ANR)](https://developer.android.com/topic/performance/vitals/anr) error at `Product` initialization. The Google Play `SkuDetailsResponseListener.onSkuDetailsResponse` callback is now quickly handled.
+- Amazon - Fixed `Product.metadata.localizedPrice` incorrectly being `0.00` for certain price formats.
+- Apple, Mac App Store - Fixes Apple Silicon "arm64" support, missing from unitypurchasing bundle.
+
+### Changed
+- Reorganized and renamed APIs:
+  - `CodelessIAPStoreListener.Instance.ExtensionProvider.GetExtension` to `CodelessIAPStoreListener.Instance.GetStoreExtensions` to match the new `GetStoreConfiguration` API, above
+  - `IGooglePlayStoreExtensions.NotifyDeferredProrationUpgradeDowngradeSubscription` to `IGooglePlayConfiguration.NotifyDeferredProrationUpgradeDowngradeSubscription`
+  - `IGooglePlayStoreExtensions.NotifyDeferredPurchase` to `IGooglePlayConfiguration.NotifyDeferredPurchase` 
+  - `IGooglePlayStoreExtensions.SetDeferredProrationUpgradeDowngradeSubscriptionListener` to `IGooglePlayConfiguration.SetDeferredProrationUpgradeDowngradeSubscriptionListener` 
+  - `IGooglePlayStoreExtensions.SetDeferredPurchaseListener` to `IGooglePlayConfiguration.SetDeferredPurchaseListener`
+  - `IGooglePlayStoreExtensions.SetObfuscatedAccountId` to `IGooglePlayConfiguration.SetObfuscatedAccountId` 
+  - `IGooglePlayStoreExtensions.SetObfuscatedProfileId` to `IGooglePlayConfiguration.SetObfuscatedProfileId`
+- Apple - Change the order of execution of the post-process build script, which adds the `StoreKitFramework` such that other post-process build scripts can run after it.
+- Changed the __Target Android__ Menu app store selection feature to display a window under `Window > Unity IAP > Switch Store...`. To set the app store for the next build, first use __Build Settings__ to activate the Android build target. 
+- For the future Unity 2022
+  - Moved Unity IAP menu items from `Window > Unity IAP > ...` to  `Services > In-App Purchasing > ...`
+  - Updated and added new functionnality to the `Services > In-App Purchasing` window in the `Project Settings`. The `Current Targeted Store` selector and `Receipt Obfuscator` settings are now accessible from this window.
+
+### Removed
+- Samsung Galaxy - Removed Samsung Galaxy Store in-app purchasing support. Use the [Unity Distribution Portal](https://unity.com/products/unity-distribution-portal) for the continued support of the Samsung Galaxy Store.
+    - All related classes and implementations have been removed including `AppStore.SamsungApps`.
+- Removed the following obsolete API:
+  - `CloudCatalogImpl`
+  - `CloudCatalogUploader`
+  - `CloudJSONProductCatalogExporter`
+  - `EventDestType`
+  - All `GooglePlayReceipt` constructors. Use `GooglePlayReceipt(string productID, string orderID, string packageName, string purchaseToken, DateTime purchaseTime, GooglePurchaseState purchaseState)` instead.
+  - `IAndroidStoreSelection.androidStore`
+  - `IDs.useCloudCatalog`
+  - `IGooglePlayConfiguration.SetPublicKey`
+  - `IGooglePlayConfiguration.UsePurchaseTokenForTransactionId`
+  - `IGooglePlayConfiguration.aggressivelyRecoverLostPurchases`
+  - `IGooglePlayStoreExtensionsMethod.FinishAdditionalTransaction`
+  - `IGooglePlayStoreExtensionsMethod.GetProductJSONDictionary`
+  - `IGooglePlayStoreExtensionsMethod.IsOwned`
+  - `IGooglePlayStoreExtensionsMethod.SetLogLevel`
+  - `IManagedStoreConfig`
+  - `IManagedStoreExtensions`
+  - `IStoreCallback.OnPurchasesRetrieved`. Use `IStoreCallback.OnAllPurchasesRetrieved` instead.
+  - `Promo`
+  - `StandardPurchasingModule.Instance(AndroidStore)`. Use `StandardPurchasingModule.Instance(AppStore)` instead.
+  - `StandardPurchasingModule.androidStore`. Use `StandardPurchasingModule.appStore` instead.
+  - `StandardPurchasingModule.useMockBillingSystem`. Use `IMicrosoftConfiguration` instead.
+  - `StoreTestMode`
+  - `UnityPurchasingEditor.TargetAndroidStore(AndroidStore)`. Use `TargetAndroidStore(AppStore)` instead.
+  - `WinRT` class. Use `WindowsStore` instead.
+  - `WindowsPhone8` class. Use `WindowsStore` instead.
+  
+## [3.2.3] - 2021-07-08
+### Fixed
+- GooglePlay - Fix `DuplicateTransaction` errors seen during purchase, after a purchase had previously been Acknowledged with Google.
+- GooglePlay - Fix `DuplicateTransaction` errors seen after a user starts a purchase on a game with Unity IAP 1.x or 2.x, quits their game, upgrades their game to include a version of Unity IAP 3.x, and tries to finish consuming / completing that old purchase.
 
 ## [3.2.2] - 2021-06-02
+### Added
+- Sample to the [Package Manager Details view](https://docs.unity3d.com/Manual/upm-ui-details.html) for com.unity.purchasing:
+  - Buying consumables
+
 ### Fixed
 - WebGL - While WebGL is not supported with an included app store implementation, the WebGL Player will no longer crash when the `StandardPurchasingModule.Initialize` API is called if Project Settings > Player > WebGL > Publishing Settings > Enable Exceptions > "Explicitly Thrown Exceptions Only" or "None" are set.
 - Amazon - Better support for Android R8 compiler. Added minification (Project Settings > Player > Publishing Settings > Minify) "keep" ProGuard rules.

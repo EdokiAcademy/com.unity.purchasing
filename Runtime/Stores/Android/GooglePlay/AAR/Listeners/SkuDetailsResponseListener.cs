@@ -1,4 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using Uniject;
+using UnityEngine.Purchasing.Models;
 using UnityEngine.Scripting;
 
 namespace UnityEngine.Purchasing
@@ -11,17 +15,25 @@ namespace UnityEngine.Purchasing
     {
         const string k_AndroidSkuDetailsResponseListenerClassName = "com.android.billingclient.api.SkuDetailsResponseListener";
 
-        Action<AndroidJavaObject, AndroidJavaObject> m_OnSkuDetailsResponse;
-        internal SkuDetailsResponseListener(Action<AndroidJavaObject, AndroidJavaObject> onSkuDetailsResponseAction)
+        Action<IGoogleBillingResult, List<AndroidJavaObject>> m_OnSkuDetailsResponse;
+        IUtil m_Util;
+
+        internal SkuDetailsResponseListener(
+            Action<IGoogleBillingResult, List<AndroidJavaObject>> onSkuDetailsResponseAction, IUtil util)
             : base(k_AndroidSkuDetailsResponseListenerClassName)
         {
             m_OnSkuDetailsResponse = onSkuDetailsResponseAction;
+            m_Util = util;
         }
 
         [Preserve]
         void onSkuDetailsResponse(AndroidJavaObject billingResult, AndroidJavaObject skuDetails)
         {
-            m_OnSkuDetailsResponse(billingResult, skuDetails);
+            m_Util.RunOnMainThread(() =>
+            {
+                var skuDetailsList = skuDetails.Enumerate<AndroidJavaObject>().ToList();
+                m_OnSkuDetailsResponse(new GoogleBillingResult(billingResult), skuDetailsList);
+            });
         }
     }
 }

@@ -18,7 +18,7 @@ namespace UnityEngine.Purchasing
             m_QuerySkuDetailsService = querySkuDetailsService;
         }
 
-        public void Purchase(ProductDefinition product, Product oldProduct, int desiredProrationMode)
+        public void Purchase(ProductDefinition product, Product oldProduct, GooglePlayProrationMode? desiredProrationMode)
         {
             m_QuerySkuDetailsService.QueryAsyncSku(product,
                 skus =>
@@ -27,7 +27,7 @@ namespace UnityEngine.Purchasing
                 });
         }
 
-        void OnQuerySkuDetailsResponse(List<AndroidJavaObject> skus, ProductDefinition productToBuy, Product oldProduct, int desiredProrationMode)
+        void OnQuerySkuDetailsResponse(List<AndroidJavaObject> skus, ProductDefinition productToBuy, Product oldProduct, GooglePlayProrationMode? desiredProrationMode)
         {
             if (skus?.Count > 0)
             {
@@ -56,9 +56,9 @@ namespace UnityEngine.Purchasing
             }
         }
 
-        void HandleBillingFlowResult(GoogleBillingResult billingResult, AndroidJavaObject sku)
+        void HandleBillingFlowResult(IGoogleBillingResult billingResult, AndroidJavaObject sku)
         {
-            if (billingResult.responseCode != BillingClientResponseEnum.OK())
+            if (billingResult.responseCode != GoogleBillingResponseCode.Ok)
             {
                 m_GooglePurchaseCallback.OnPurchaseFailed(
                     new PurchaseFailureDescription(
