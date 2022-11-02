@@ -31,23 +31,23 @@ static class BuildTargetGroupExtensions
 
             case BuildTargetGroup.iOS:
             case BuildTargetGroup.tvOS:
-                storesArray = new[] {AppStore.AppleAppStore};
+                storesArray = new[] { AppStore.AppleAppStore };
                 break;
 
             case BuildTargetGroup.WSA:
-                storesArray = new[] {AppStore.WinRT};
+                storesArray = new[] { AppStore.WinRT };
                 break;
 
             case BuildTargetGroup.Standalone:
                 if (Application.platform == RuntimePlatform.OSXEditor)
                 {
-                    storesArray = new[] {AppStore.MacAppStore};
+                    storesArray = new[] { AppStore.MacAppStore };
                     break;
                 }
                 goto default;
 
             default:
-                storesArray = new[] {AppStore.fake};
+                storesArray = new[] { AppStore.fake };
                 break;
         }
 

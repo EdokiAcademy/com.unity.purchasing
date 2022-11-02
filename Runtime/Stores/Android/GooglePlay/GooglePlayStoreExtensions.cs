@@ -3,21 +3,26 @@ using System.Collections.Generic;
 using UnityEngine.Purchasing.Extension;
 using UnityEngine.Purchasing.Interfaces;
 using UnityEngine.Purchasing.Models;
+using UnityEngine.Purchasing.Telemetry;
 
 namespace UnityEngine.Purchasing
 {
-    class GooglePlayStoreExtensions: IGooglePlayStoreExtensions, IGooglePlayStoreExtensionsInternal
+    class GooglePlayStoreExtensions : IGooglePlayStoreExtensions, IGooglePlayStoreExtensionsInternal
     {
-        IGooglePlayStoreService m_GooglePlayStoreService;
-        IGooglePlayStoreFinishTransactionService m_GooglePlayStoreFinishTransactionService;
+        readonly IGooglePlayStoreService m_GooglePlayStoreService;
+        readonly IGooglePlayStoreFinishTransactionService m_GooglePlayStoreFinishTransactionService;
+        readonly ITelemetryDiagnostics m_TelemetryDiagnostics;
+        readonly ILogger m_Logger;
         IStoreCallback m_StoreCallback;
-        Action<Product> m_DeferredPurchaseAction;
-        Action<Product> m_DeferredProrationUpgradeDowngradeSubscriptionAction;
+        readonly Action<Product> m_DeferredPurchaseAction;
+        readonly Action<Product> m_DeferredProrationUpgradeDowngradeSubscriptionAction;
 
-        internal GooglePlayStoreExtensions(IGooglePlayStoreService googlePlayStoreService, IGooglePlayStoreFinishTransactionService googlePlayStoreFinishTransactionService)
+        internal GooglePlayStoreExtensions(IGooglePlayStoreService googlePlayStoreService, IGooglePlayStoreFinishTransactionService googlePlayStoreFinishTransactionService, ILogger logger, ITelemetryDiagnostics telemetryDiagnostics)
         {
             m_GooglePlayStoreService = googlePlayStoreService;
             m_GooglePlayStoreFinishTransactionService = googlePlayStoreFinishTransactionService;
+            m_Logger = logger;
+            m_TelemetryDiagnostics = telemetryDiagnostics;
         }
 
         public void UpgradeDowngradeSubscription(string oldSku, string newSku)
@@ -27,19 +32,15 @@ namespace UnityEngine.Purchasing
 
         public void UpgradeDowngradeSubscription(string oldSku, string newSku, int desiredProrationMode)
         {
-            UpgradeDowngradeSubscription(oldSku, newSku, (GooglePlayProrationMode) desiredProrationMode);
+            UpgradeDowngradeSubscription(oldSku, newSku, (GooglePlayProrationMode)desiredProrationMode);
         }
 
-        public void UpgradeDowngradeSubscription(string oldSku, string newSku, GooglePlayProrationMode desiredProrationMode)
+        public virtual void UpgradeDowngradeSubscription(string oldSku, string newSku, GooglePlayProrationMode desiredProrationMode)
         {
-            Product product = m_StoreCallback.FindProductById(newSku);
-            Product oldProduct = m_StoreCallback.FindProductById(oldSku);
-            if (product != null && product.definition.type == ProductType.Subscription &&
-                oldProduct != null && oldProduct.definition.type == ProductType.Subscription)
-            {
-                m_GooglePlayStoreService.Purchase(product.definition, oldProduct, desiredProrationMode);
-            }
-            else
+            var product = m_StoreCallback.FindProductById(newSku);
+            var oldProduct = m_StoreCallback.FindProductById(oldSku);
+            if (product == null || product.definition.type != ProductType.Subscription ||
+                oldProduct == null || oldProduct.definition.type != ProductType.Subscription)
             {
                 m_StoreCallback?.OnPurchaseFailed(
                     new PurchaseFailureDescription(
@@ -47,37 +48,32 @@ namespace UnityEngine.Purchasing
                         PurchaseFailureReason.ProductUnavailable,
                         "Please verify that the products are subscriptions and are not null."));
             }
-        }
-
-        public void RestoreTransactions(Action<bool> callback)
-        {
-            m_GooglePlayStoreService.FetchPurchases(purchase =>
+            else if (string.IsNullOrEmpty(oldProduct.transactionID))
             {
-                if (purchase != null)
-                {
-                    callback(true);
-                }
-            });
-        }
-
-        public void FinishAdditionalTransaction(string productId, string transactionId)
-        {
-            Product product = m_StoreCallback.FindProductById(productId);
-            if (product != null && transactionId != null)
-            {
-                m_GooglePlayStoreFinishTransactionService.FinishTransaction(product.definition, transactionId);
+                m_StoreCallback?.OnPurchaseFailed(
+                    new PurchaseFailureDescription(
+                        newSku ?? "",
+                        PurchaseFailureReason.ProductUnavailable,
+                        "Invalid transaction id for old product: " + oldProduct.definition.id));
             }
             else
             {
-                m_StoreCallback?.OnPurchaseFailed(
-                    new PurchaseFailureDescription(productId ?? "", PurchaseFailureReason.ProductUnavailable,
-                        "Please make the product id and transaction id is not null"));
+                m_GooglePlayStoreService.Purchase(product.definition, oldProduct, desiredProrationMode);
             }
+        }
+
+        public virtual void RestoreTransactions(Action<bool> callback)
+        {
+            if (callback == null)
+            {
+                m_Logger.LogIAPError("RestoreTransactions called with a null callback. Please provide a callback to avoid null pointer exceptions");
+            }
+            m_GooglePlayStoreService.FetchPurchases(_ => { callback?.Invoke(true); });
         }
 
         public void ConfirmSubscriptionPriceChange(string productId, Action<bool> callback)
         {
-            Product product = m_StoreCallback.FindProductById(productId);
+            var product = m_StoreCallback.FindProductById(productId);
             if (product != null)
             {
                 m_GooglePlayStoreService.ConfirmSubscriptionPriceChange(product.definition, result =>
@@ -94,25 +90,43 @@ namespace UnityEngine.Purchasing
 
         public bool IsPurchasedProductDeferred(Product product)
         {
-            try
+            if (product == null)
             {
-                var unifiedReceipt = MiniJson.JsonDecode(product.receipt) as Dictionary<string, object>;
-                var payloadStr = unifiedReceipt["Payload"] as string;
-
-                var payload = MiniJson.JsonDecode(payloadStr) as Dictionary<string, object>;
-                var jsonStr = payload["json"] as string;
-
-                var jsonDic = MiniJson.JsonDecode(jsonStr) as Dictionary<string, object>;
-                var purchaseState = (long)jsonDic["purchaseState"];
-
-                //PurchaseState codes: https://developer.android.com/reference/com/android/billingclient/api/Purchase.PurchaseState#pending
-                return purchaseState == 2 || purchaseState == 4;
-            }
-            catch
-            {
-                Debug.LogWarning("Cannot parse Google receipt for transaction " + product.transactionID);
+                m_Logger.LogIAPWarning("IsPurchasedProductDeferred: the product is null.");
                 return false;
             }
+
+            try
+            {
+                return TryIsPurchasedProductDeferred(product);
+            }
+            catch (Exception ex)
+            {
+                m_TelemetryDiagnostics.SendDiagnostic(TelemetryDiagnosticNames.ParseReceiptTransactionError, ex);
+                m_Logger.LogIAPWarning("Cannot parse Google receipt for transaction " + product.transactionID);
+                return false;
+            }
+        }
+
+        static bool TryIsPurchasedProductDeferred(Product product)
+        {
+            var purchaseState = GetPurchaseState(product);
+
+            //PurchaseState codes: https://developer.android.com/reference/com/android/billingclient/api/Purchase.PurchaseState#pending
+            return purchaseState == 2 || purchaseState == 4;
+        }
+
+        static long GetPurchaseState(Product product)
+        {
+            var unifiedReceipt = MiniJson.JsonDecode(product.receipt) as Dictionary<string, object>;
+            var payloadStr = unifiedReceipt["Payload"] as string;
+
+            var payload = MiniJson.JsonDecode(payloadStr) as Dictionary<string, object>;
+            var jsonStr = payload["json"] as string;
+
+            var jsonDic = MiniJson.JsonDecode(jsonStr) as Dictionary<string, object>;
+            var purchaseState = (long)jsonDic["purchaseState"];
+            return purchaseState;
         }
     }
 }

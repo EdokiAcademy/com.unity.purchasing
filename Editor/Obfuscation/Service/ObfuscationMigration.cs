@@ -32,7 +32,7 @@ namespace UnityEditor.Purchasing
 
         private static void MoveObfuscatorFiles(string oldPath)
         {
-            Directory.CreateDirectory (TangleFileConsts.k_OutputPath);
+            Directory.CreateDirectory(TangleFileConsts.k_OutputPath);
 
             foreach (var prevFile in Directory.GetFiles(oldPath))
             {
@@ -40,7 +40,7 @@ namespace UnityEditor.Purchasing
             }
         }
 
-        static void  MoveObfuscatorFile(string file)
+        static void MoveObfuscatorFile(string file)
         {
             var fileName = Path.GetFileName(file);
             if (fileName.EndsWith(TangleFileConsts.k_ObfuscationClassSuffix))
@@ -56,12 +56,12 @@ namespace UnityEditor.Purchasing
 
         internal static bool CheckPreviousObfuscationFilesExist()
         {
-            return (Directory.Exists(TangleFileConsts.k_PrevOutputPath) && (Directory.GetFiles(TangleFileConsts.k_PrevOutputPath).Length > 0));
+            return Directory.Exists(TangleFileConsts.k_PrevOutputPath) && (Directory.GetFiles(TangleFileConsts.k_PrevOutputPath).Length > 0);
         }
 
         internal static bool CheckBadObfuscationFilesExist()
         {
-            return (Directory.Exists(TangleFileConsts.k_BadOutputPath) && (Directory.GetFiles(TangleFileConsts.k_BadOutputPath).Length > 0));
+            return Directory.Exists(TangleFileConsts.k_BadOutputPath) && (Directory.GetFiles(TangleFileConsts.k_BadOutputPath).Length > 0);
         }
     }
 }

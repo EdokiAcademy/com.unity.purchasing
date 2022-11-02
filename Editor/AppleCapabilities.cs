@@ -14,7 +14,10 @@ namespace UnityEditor.Purchasing
 
         public void OnPostprocessBuild(BuildReport report)
         {
-            OnPostprocessBuild(report.summary.platform, report.summary.outputPath);
+            if (report.summary.platform == BuildTarget.tvOS || report.summary.platform == BuildTarget.iOS)
+            {
+                OnPostprocessBuild(report.summary.platform, report.summary.outputPath);
+            }
         }
 
         static void OnPostprocessBuild(BuildTarget buildTarget, string path)
@@ -45,7 +48,7 @@ namespace UnityEditor.Purchasing
 
         static void AddStoreKitFramework(PBXProject proj, string projPath)
         {
-            foreach (var targetGuid in new [] {proj.GetUnityMainTargetGuid(), proj.GetUnityFrameworkTargetGuid()})
+            foreach (var targetGuid in new[] { proj.GetUnityMainTargetGuid(), proj.GetUnityFrameworkTargetGuid() })
             {
                 proj.AddFrameworkToProject(targetGuid, k_StorekitFramework, false);
                 System.IO.File.WriteAllText(projPath, proj.WriteToString());

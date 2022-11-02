@@ -1,21 +1,22 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Uniject;
 using UnityEngine.Purchasing.Extension;
 using UnityEngine.Purchasing.Interfaces;
-using UnityEngine.Purchasing.Models;
 
 namespace UnityEngine.Purchasing
 {
     class GoogleFetchPurchases : IGoogleFetchPurchases
     {
-        IGooglePlayStoreService m_GooglePlayStoreService;
-        IGooglePlayStoreFinishTransactionService m_TransactionService;
+        readonly IGooglePlayStoreService m_GooglePlayStoreService;
         IStoreCallback m_StoreCallback;
-        internal GoogleFetchPurchases(IGooglePlayStoreService googlePlayStoreService, IGooglePlayStoreFinishTransactionService transactionService)
+        IUtil m_Util;
+
+        internal GoogleFetchPurchases(IGooglePlayStoreService googlePlayStoreService, IUtil util)
         {
             m_GooglePlayStoreService = googlePlayStoreService;
-            m_TransactionService = transactionService;
+            m_Util = util;
         }
 
         public void SetStoreCallback(IStoreCallback storeCallback)
@@ -37,48 +38,76 @@ namespace UnityEngine.Purchasing
                 });
         }
 
-        List<Product> FillProductsWithPurchases(IEnumerable<GooglePurchase> purchases)
+        List<Product> FillProductsWithPurchases(IEnumerable<IGooglePurchase> purchases)
         {
-            var purchasedProducts = new List<Product>();
-
-            foreach (var purchase in purchases.Where(purchase => purchase != null).ToList())
-            {
-                var product = m_StoreCallback?.FindProductById(purchase.sku);
-                if (product != null)
-                {
-                    var updatedProduct = new Product(product.definition, product.metadata, purchase.receipt)
-                    {
-                        transactionID = purchase.purchaseToken
-                    };
-                    purchasedProducts.Add(updatedProduct);
-                }
-            }
-
-            return purchasedProducts;
+            return purchases.SelectMany(BuildProductsFromPurchase).ToList();
         }
 
-        void OnFetchedPurchase(List<GooglePurchase> purchases)
+        IEnumerable<Product> BuildProductsFromPurchase(IGooglePurchase purchase)
         {
-            if (purchases != null)
+            var products = purchase?.skus?.Select(sku => m_StoreCallback?.FindProductById(sku)).NonNull();
+            return products?.Select(product => CompleteProductInfoWithPurchase(product, purchase));
+        }
+
+        static Product CompleteProductInfoWithPurchase(Product product, IGooglePurchase purchase)
+        {
+            return new Product(product.definition, product.metadata, purchase.receipt)
             {
-                var purchasedProducts = FillProductsWithPurchases(purchases);
-                if (purchasedProducts.Count > 0)
-                {
-                    m_StoreCallback?.OnAllPurchasesRetrieved(purchasedProducts);
-                }
+                transactionID = purchase.purchaseToken,
+            };
+        }
+
+        void OnFetchedPurchase(List<IGooglePurchase> purchases)
+        {
+            var purchasedPurchases = purchases.Where(PurchaseIsPurchased()).ToList();
+            var purchasedProducts = FillProductsWithPurchases(purchasedPurchases);
+            if (!purchasedProducts.Any())
+            {
+                return;
+            }
+
+            m_StoreCallback?.OnAllPurchasesRetrieved(purchasedProducts);
+
+            var deferredPurchases = purchases.Where(PurchaseIsPending()).ToList();
+
+            // OnAllPurchasesRetrieved is run on the main thread. In order to have UpdateDeferredProducts happen after
+            // it, it needs to also be run on the main thread.
+            m_Util.RunOnMainThread(() => UpdateDeferredProductsByPurchases(deferredPurchases));
+        }
+
+        static Func<IGooglePurchase, bool> PurchaseIsPurchased()
+        {
+            return purchase => purchase.IsPurchased();
+        }
+
+        static Func<IGooglePurchase, bool> PurchaseIsPending()
+        {
+            return purchase => purchase.IsPending();
+        }
+
+        void UpdateDeferredProductsByPurchases(List<IGooglePurchase> deferredPurchases)
+        {
+            foreach (var deferredPurchase in deferredPurchases)
+            {
+                UpdateDeferredProductsByPurchase(deferredPurchase);
             }
         }
 
-        void FinishTransaction(GooglePurchase purchase)
+        void UpdateDeferredProductsByPurchase(IGooglePurchase deferredPurchase)
         {
-            Product product = m_StoreCallback.FindProductById(purchase.sku);
+            foreach (var sku in deferredPurchase.skus)
+            {
+                UpdateDeferredProduct(deferredPurchase, sku);
+            }
+        }
+
+        void UpdateDeferredProduct(IGooglePurchase deferredPurchase, string sku)
+        {
+            var product = m_StoreCallback?.FindProductById(sku);
             if (product != null)
             {
-                m_TransactionService.FinishTransaction(product.definition, purchase.purchaseToken);
-            }
-            else
-            {
-                m_StoreCallback.OnPurchaseFailed(new PurchaseFailureDescription(purchase.sku, PurchaseFailureReason.ProductUnavailable, "Product was not found but was purchased"));
+                product.receipt = deferredPurchase.receipt;
+                product.transactionID = deferredPurchase.purchaseToken;
             }
         }
     }

@@ -26,7 +26,7 @@ namespace UnityEditor.Purchasing
 
         internal static void PromptUdpInstallation()
         {
-            var window = (UdpInstallInstructionsWindow) EditorWindow.GetWindow(typeof(UdpInstallInstructionsWindow));
+            var window = (UdpInstallInstructionsWindow)EditorWindow.GetWindow(typeof(UdpInstallInstructionsWindow));
 #if UNITY_2019_3_OR_NEWER
             window.titleContent.text = k_PackManWindowTitle;
 #else
@@ -102,7 +102,7 @@ namespace UnityEditor.Purchasing
         void GoToInstaller()
         {
 #if UNITY_2019_3_OR_NEWER
-            PackageManager.UI.Window.Open(k_UdpPackageName);
+            Window.Open(k_UdpPackageName);
 #else
             AssetStore.Open(k_UdpAssetStoreIdentifier);
 #endif

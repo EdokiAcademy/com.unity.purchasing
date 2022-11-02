@@ -54,17 +54,20 @@ namespace UnityEditor.Purchasing
         /// </summary>
         string m_GooglePlayPublicKey = kPublicKeyPlaceholder;
 
-        #if !ENABLE_EDITOR_GAME_SERVICES
+#if !ENABLE_EDITOR_GAME_SERVICES
         [MenuItem(IapMenuConsts.MenuItemRoot + "/Receipt Validation Obfuscator...", false, 200)]
         static void Init()
         {
             // Get existing open window or if none, make a new one:
-            ObfuscatorWindow window = (ObfuscatorWindow) EditorWindow.GetWindow(typeof(ObfuscatorWindow));
+            var window = (ObfuscatorWindow)GetWindow(typeof(ObfuscatorWindow));
             window.titleContent.text = kLabelTitle;
             window.minSize = new Vector2(340, 180);
             window.Show();
+
+            GenericEditorMenuItemClickEventSenderHelpers.SendIapMenuOpenObfuscatorEvent();
+            GameServicesEventSenderHelpers.SendTopMenuReceiptValidationObfuscatorEvent();
         }
-        #endif
+#endif
 
         private ObfuscatorWindow()
         {
@@ -80,7 +83,9 @@ namespace UnityEditor.Purchasing
 
             // Apple error message, if any
             if (!string.IsNullOrEmpty(m_AppleError))
+            {
                 GUILayout.Label(m_AppleError, m_ErrorStyle);
+            }
 
             // Google Play
             GUILayout.Label(kLabelGoogleKey, EditorStyles.boldLabel);
@@ -99,9 +104,14 @@ namespace UnityEditor.Purchasing
 
             GUILayout.Label(kObfuscateKeyInstructions);
             if (!string.IsNullOrEmpty(m_GoogleError))
+            {
                 GUILayout.Label(m_GoogleError, m_ErrorStyle);
+            }
+
             if (GUILayout.Button(kLabelGenerateGoogle))
+            {
                 ObfuscateSecrets(includeGoogle: true);
+            }
 
             GUILayout.Label(kDashboardInstructions);
 

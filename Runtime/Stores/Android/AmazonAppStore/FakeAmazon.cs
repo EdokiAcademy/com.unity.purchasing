@@ -9,7 +9,7 @@ namespace UnityEngine.Purchasing
     /// Access Amazon store specific functionality.
     /// </summary>
     public class FakeAmazonExtensions : IAmazonExtensions, IAmazonConfiguration
-	{
+    {
         /// <summary>
         /// THIS IS A FAKE, NO CODE WILL BE EXECUTED!
         ///
@@ -17,8 +17,8 @@ namespace UnityEngine.Purchasing
         /// </summary>
         /// <param name="products">Products to add to the testing app JSON.</param>
         public void WriteSandboxJSON(HashSet<ProductDefinition> products)
-		{
-		}
+        {
+        }
 
         /// <summary>
         /// THIS IS A FAKE, NO CODE WILL BE EXECUTED!
@@ -29,17 +29,15 @@ namespace UnityEngine.Purchasing
         /// https://developer.amazon.com/public/apis/earn/in-app-purchasing/docs-v2/implementing-iap-2.0
         /// </summary>
         /// <param name="transactionID">Products transaction id</param>
-		public void NotifyUnableToFulfillUnavailableProduct(string transactionID) {
-		}
+        public void NotifyUnableToFulfillUnavailableProduct(string transactionID)
+        {
+        }
 
         /// <summary>
         /// THIS IS A FAKE, NO CODE WILL BE EXECUTED!
         ///
         /// Gets the current Amazon user ID (for other Amazon services).
         /// </summary>
-        public string amazonUserId
-		{
-			get { return "fakeid"; }
-		}
-	}
+        public string amazonUserId => "fakeid";
+    }
 }

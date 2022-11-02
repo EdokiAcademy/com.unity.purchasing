@@ -1,6 +1,6 @@
 using System;
-using System.Collections.ObjectModel;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using UnityEngine.Purchasing.Extension;
 
@@ -11,26 +11,30 @@ namespace UnityEngine.Purchasing
     /// </summary>
     internal class PurchasingManager : IStoreCallback, IStoreController
     {
-        private IStore m_Store;
+        private readonly IStore m_Store;
         private IInternalStoreListener m_Listener;
-        private ILogger m_Logger;
-        private TransactionLog m_TransactionLog;
-        private string m_StoreName;
+        private readonly ILogger m_Logger;
+        private readonly TransactionLog m_TransactionLog;
+        private readonly string m_StoreName;
+        private readonly IUnityServicesInitializationChecker m_UnityServicesInitializationChecker;
         private Action m_AdditionalProductsCallback;
         private Action<InitializationFailureReason> m_AdditionalProductsFailCallback;
+
+        private readonly HashSet<string> purchasesProcessedInSession = new HashSet<string>();
 
         /// <summary>
         /// Stores may opt to disable Unity IAP's transaction log.
         /// </summary>
         public bool useTransactionLog { get; set; }
 
-        internal PurchasingManager(TransactionLog tDb, ILogger logger, IStore store, string storeName)
+        internal PurchasingManager(TransactionLog tDb, ILogger logger, IStore store, string storeName, IUnityServicesInitializationChecker unityServicesInitializationChecker)
         {
             m_TransactionLog = tDb;
             m_Store = store;
             m_Logger = logger;
             m_StoreName = storeName;
             useTransactionLog = true;
+            m_UnityServicesInitializationChecker = unityServicesInitializationChecker;
         }
 
         public void InitiatePurchase(Product product)
@@ -45,9 +49,11 @@ namespace UnityEngine.Purchasing
 
         public void InitiatePurchase(Product product, string developerPayload)
         {
+            m_UnityServicesInitializationChecker.CheckAndLogWarning();
+
             if (null == product)
             {
-                m_Logger.LogWarning("Unity IAP", "Trying to purchase null Product");
+                m_Logger.LogIAPWarning("Trying to purchase null Product");
                 return;
             }
 
@@ -62,9 +68,12 @@ namespace UnityEngine.Purchasing
 
         public void InitiatePurchase(string purchasableId, string developerPayload)
         {
-            Product product = products.WithID(purchasableId);
+            var product = products.WithID(purchasableId);
             if (null == product)
+            {
                 m_Logger.LogFormat(LogType.Warning, "Unable to purchase unknown product with id: {0}", purchasableId);
+            }
+
             InitiatePurchase(product, developerPayload);
         }
 
@@ -76,18 +85,21 @@ namespace UnityEngine.Purchasing
         {
             if (null == product)
             {
-                m_Logger.LogError("Unity IAP", "Unable to confirm purchase with null Product");
+                m_Logger.LogIAPError("Unable to confirm purchase with null Product");
                 return;
             }
 
             if (string.IsNullOrEmpty(product.transactionID))
             {
-                m_Logger.LogError("Unity IAP", "Unable to confirm purchase; Product has missing or empty transactionID");
+                m_Logger.LogIAPError("Unable to confirm purchase; Product has missing or empty transactionID");
                 return;
             }
 
             if (useTransactionLog)
+            {
                 m_TransactionLog.Record(product.transactionID);
+            }
+
             m_Store.FinishTransaction(product.definition, product.transactionID);
         }
 
@@ -107,11 +119,11 @@ namespace UnityEngine.Purchasing
                 var definition = new ProductDefinition(id, ProductType.NonConsumable);
                 product = new Product(definition, new ProductMetadata());
             }
-            UpdateProductReceiptAndTrandsactionID(product, receipt, transactionId);
+            UpdateProductReceiptAndTransactionID(product, receipt, transactionId);
             ProcessPurchaseIfNew(product);
         }
 
-        void UpdateProductReceiptAndTrandsactionID(Product product, string receipt, string transactionId)
+        void UpdateProductReceiptAndTransactionID(Product product, string receipt, string transactionId)
         {
             if (product != null)
             {
@@ -139,9 +151,24 @@ namespace UnityEngine.Purchasing
             }
         }
 
+        // TODO IAP-2929: Add this to IStoreCallback in a major release
+        internal static void OnEntitlementRevoked(Product revokedProduct)
+        {
+            ClearProductReceipt(revokedProduct);
+        }
+
         void HandlePurchaseRetrieved(Product product, Product purchasedProduct)
         {
-            UpdateProductReceiptAndTrandsactionID(product, purchasedProduct.receipt, purchasedProduct.transactionID);
+            UpdateProductReceiptAndTransactionID(product, purchasedProduct.receipt, purchasedProduct.transactionID);
+            if (initialized && !WasPurchaseAlreadyProcessed(purchasedProduct.transactionID))
+            {
+                ProcessPurchaseIfNew(product);
+            }
+        }
+
+        bool WasPurchaseAlreadyProcessed(string transactionId)
+        {
+            return purchasesProcessedInSession.Contains(transactionId);
         }
 
         static void ClearProductReceipt(Product product)
@@ -154,11 +181,12 @@ namespace UnityEngine.Purchasing
         {
             if (initialized)
             {
-                if (null != m_AdditionalProductsFailCallback)
-                    m_AdditionalProductsFailCallback(reason);
+                m_AdditionalProductsFailCallback?.Invoke(reason);
             }
             else
+            {
                 m_Listener.OnInitializeFailed(reason);
+            }
         }
 
         public void OnPurchaseFailed(PurchaseFailureDescription description)
@@ -246,17 +274,26 @@ namespace UnityEngine.Purchasing
         /// </summary>
         private void ProcessPurchaseIfNew(Product product)
         {
-            if (useTransactionLog && m_TransactionLog.HasRecordOf(product.transactionID))
+            if (HasRecordedTransaction(product.transactionID))
             {
                 m_Store.FinishTransaction(product.definition, product.transactionID);
                 return;
             }
 
+            purchasesProcessedInSession.Add(product.transactionID);
+
             var p = new PurchaseEventArgs(product);
             // Applications may elect to delay confirmations of purchases,
             // such as when persisting purchase state asynchronously.
             if (PurchaseProcessingResult.Complete == m_Listener.ProcessPurchase(p))
+            {
                 ConfirmPendingPurchase(product);
+            }
+        }
+
+        bool HasRecordedTransaction(string transactionId)
+        {
+            return useTransactionLog && m_TransactionLog.HasRecordOf(transactionId);
         }
 
         private bool initialized;
@@ -279,8 +316,7 @@ namespace UnityEngine.Purchasing
             }
             else
             {
-                if (null != m_AdditionalProductsCallback)
-                    m_AdditionalProductsCallback();
+                m_AdditionalProductsCallback?.Invoke();
             }
         }
 

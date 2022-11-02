@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using UnityEngine.Purchasing.Extension;
 using UnityEngine.Purchasing.Interfaces;
 using UnityEngine.Purchasing.Models;
@@ -13,18 +14,34 @@ namespace UnityEngine.Purchasing
     /// This is C# representation of the Java Class PurchasesUpdatedListener
     /// <a href="https://developer.android.com/reference/com/android/billingclient/api/PurchasesUpdatedListener">See more</a>
     /// </summary>
-    class GooglePurchaseUpdatedListener: AndroidJavaProxy, IGooglePurchaseUpdatedListener
+    class GooglePurchaseUpdatedListener : AndroidJavaProxy, IGooglePurchaseUpdatedListener
     {
         const string k_AndroidPurchaseListenerClassName = "com.android.billingclient.api.PurchasesUpdatedListener";
+        readonly IGoogleLastKnownProductService m_LastKnownProductService;
+        readonly IGooglePurchaseCallback m_GooglePurchaseCallback;
+        readonly IGooglePurchaseBuilder m_PurchaseBuilder;
+        readonly IGoogleCachedQuerySkuDetailsService m_GoogleCachedQuerySkuDetailsService;
+        readonly IGooglePurchaseStateEnumProvider m_GooglePurchaseStateEnumProvider;
+        IGoogleQueryPurchasesService m_GoogleQueryPurchasesService;
 
-        IGoogleLastKnownProductService m_LastKnownProductService;
-        IGooglePurchaseCallback m_GooglePurchaseCallback;
-        IGoogleCachedQuerySkuDetailsService m_GoogleCachedQuerySkuDetailsService;
-        internal GooglePurchaseUpdatedListener(IGoogleLastKnownProductService googleLastKnownProductService, IGooglePurchaseCallback googlePurchaseCallback, IGoogleCachedQuerySkuDetailsService googleCachedQuerySkuDetailsService): base(k_AndroidPurchaseListenerClassName)
+        internal GooglePurchaseUpdatedListener(IGoogleLastKnownProductService googleLastKnownProductService,
+            IGooglePurchaseCallback googlePurchaseCallback, IGooglePurchaseBuilder purchaseBuilder,
+            IGoogleCachedQuerySkuDetailsService googleCachedQuerySkuDetailsService,
+            IGooglePurchaseStateEnumProvider googlePurchaseStateEnumProvider,
+            IGoogleQueryPurchasesService googleQueryPurchasesService = null)
+            : base(k_AndroidPurchaseListenerClassName)
         {
             m_LastKnownProductService = googleLastKnownProductService;
             m_GooglePurchaseCallback = googlePurchaseCallback;
             m_GoogleCachedQuerySkuDetailsService = googleCachedQuerySkuDetailsService;
+            m_GooglePurchaseStateEnumProvider = googlePurchaseStateEnumProvider;
+            m_GoogleQueryPurchasesService = googleQueryPurchasesService;
+            m_PurchaseBuilder = purchaseBuilder;
+        }
+
+        public void SetGoogleQueryPurchaseService(IGoogleQueryPurchasesService googleFetchPurchases)
+        {
+            m_GoogleQueryPurchasesService = googleFetchPurchases;
         }
 
         /// <summary>
@@ -36,15 +53,19 @@ namespace UnityEngine.Purchasing
         void onPurchasesUpdated(AndroidJavaObject billingResult, AndroidJavaObject javaPurchasesList)
         {
             IGoogleBillingResult result = new GoogleBillingResult(billingResult);
-            var purchases = javaPurchasesList.Enumerate<AndroidJavaObject>();
+            var purchases = m_PurchaseBuilder.BuildPurchases(javaPurchasesList.EnumerateAndWrap()).ToList();
+            OnPurchasesUpdated(result, purchases);
+        }
 
+        internal void OnPurchasesUpdated(IGoogleBillingResult result, List<IGooglePurchase> purchases)
+        {
             if (result.responseCode == GoogleBillingResponseCode.Ok)
             {
                 HandleResultOkCases(result, purchases);
             }
             else if (result.responseCode == GoogleBillingResponseCode.UserCanceled && purchases.Any())
             {
-                ApplyOnPurchases(purchases, OnPurchaseCanceled);
+                ApplyOnPurchases(purchases, OnPurchaseCancelled);
             }
             else if (result.responseCode == GoogleBillingResponseCode.ItemAlreadyOwned && purchases.Any())
             {
@@ -56,15 +77,11 @@ namespace UnityEngine.Purchasing
             }
         }
 
-        void HandleResultOkCases(IGoogleBillingResult result, IEnumerable<AndroidJavaObject> purchases)
+        void HandleResultOkCases(IGoogleBillingResult result, List<IGooglePurchase> purchases)
         {
             if (purchases.Any())
             {
                 ApplyOnPurchases(purchases, OnPurchaseOk);
-            }
-            else if (IsLastProrationModeDeferred())
-            {
-                OnDeferredProrationUpgradeDowngradeSubscriptionOk();
             }
             else
             {
@@ -72,7 +89,7 @@ namespace UnityEngine.Purchasing
             }
         }
 
-        void HandleErrorCases(IGoogleBillingResult billingResult, IEnumerable<AndroidJavaObject> purchases)
+        void HandleErrorCases(IGoogleBillingResult billingResult, List<IGooglePurchase> purchases)
         {
             if (!purchases.Any())
             {
@@ -80,7 +97,7 @@ namespace UnityEngine.Purchasing
                 {
                     m_GooglePurchaseCallback.OnPurchaseFailed(
                         new PurchaseFailureDescription(
-                            m_LastKnownProductService.GetLastKnownProductId(),
+                            m_LastKnownProductService.LastKnownProductId,
                             PurchaseFailureReason.DuplicateTransaction,
                             billingResult.debugMessage
                         )
@@ -88,19 +105,13 @@ namespace UnityEngine.Purchasing
                 }
                 else if (billingResult.responseCode == GoogleBillingResponseCode.UserCanceled)
                 {
-                    m_GooglePurchaseCallback.OnPurchaseFailed(
-                        new PurchaseFailureDescription(
-                            m_LastKnownProductService.GetLastKnownProductId(),
-                            PurchaseFailureReason.UserCancelled,
-                            billingResult.debugMessage
-                        )
-                    );
+                    HandleUserCancelledPurchaseFailure(billingResult);
                 }
                 else
                 {
                     m_GooglePurchaseCallback.OnPurchaseFailed(
                         new PurchaseFailureDescription(
-                            m_LastKnownProductService.GetLastKnownProductId(),
+                            m_LastKnownProductService.LastKnownProductId,
                             PurchaseFailureReason.Unknown,
                             billingResult.debugMessage + " {M: GPUL.HEC} - Response Code = " + billingResult.responseCode
                         )
@@ -113,83 +124,127 @@ namespace UnityEngine.Purchasing
             }
         }
 
-        void ApplyOnPurchases(IEnumerable<AndroidJavaObject> purchases, Action<GooglePurchase> action)
+        async void HandleUserCancelledPurchaseFailure(IGoogleBillingResult billingResult)
+        {
+            var googlePurchases = await m_GoogleQueryPurchasesService.QueryPurchases();
+            HandleUserCancelledPurchaseFailure(billingResult, googlePurchases);
+        }
+
+        void HandleUserCancelledPurchaseFailure(IGoogleBillingResult billingResult,
+            List<IGooglePurchase> googlePurchases)
+        {
+            var googlePurchase = googlePurchases.FirstOrDefault(purchase =>
+                purchase?.sku == m_LastKnownProductService.LastKnownProductId);
+
+            if (googlePurchase != null && !googlePurchase.IsAcknowledged())
+            {
+                OnPurchaseOk(googlePurchase);
+            }
+            else
+            {
+                OnPurchaseCancelled(billingResult);
+            }
+        }
+
+        void ApplyOnPurchases(List<IGooglePurchase> purchases, Action<IGooglePurchase> action)
         {
             foreach (var purchase in purchases)
             {
-                GooglePurchase googlePurchase = GooglePurchaseHelper.MakeGooglePurchase(m_GoogleCachedQuerySkuDetailsService.GetCachedQueriedSkus().ToList(), purchase);
-                action(googlePurchase);
+                action(purchase);
             }
-
         }
 
-        void ApplyOnPurchases(IEnumerable<AndroidJavaObject> purchases, IGoogleBillingResult billingResult, Action<GooglePurchase, string> action)
+        void ApplyOnPurchases(IEnumerable<IGooglePurchase> purchases, IGoogleBillingResult billingResult, Action<IGooglePurchase, string> action)
         {
             foreach (var purchase in purchases)
             {
-                GooglePurchase googlePurchase = GooglePurchaseHelper.MakeGooglePurchase(m_GoogleCachedQuerySkuDetailsService.GetCachedQueriedSkus().ToList(), purchase);
-                action(googlePurchase, billingResult.debugMessage);
+                action(purchase, billingResult.debugMessage);
             }
         }
 
-        bool IsLastProrationModeDeferred()
+        void OnPurchaseOk(IGooglePurchase googlePurchase)
         {
-            return m_LastKnownProductService.GetLastKnownProrationMode() == GooglePlayProrationMode.Deferred;
-        }
-
-        void OnPurchaseOk(GooglePurchase googlePurchase)
-        {
-            if (googlePurchase.purchaseState == GooglePurchaseStateEnum.Purchased())
+            if (googlePurchase.purchaseState == m_GooglePurchaseStateEnumProvider.Purchased())
             {
-                m_GooglePurchaseCallback.OnPurchaseSuccessful(googlePurchase.sku, googlePurchase.receipt, googlePurchase.purchaseToken);
+                HandlePurchasedProduct(googlePurchase);
             }
-            else if (googlePurchase.purchaseState == GooglePurchaseStateEnum.Pending())
+            else if (googlePurchase.purchaseState == m_GooglePurchaseStateEnumProvider.Pending())
             {
-                m_GooglePurchaseCallback.NotifyDeferredPurchase(googlePurchase.sku, googlePurchase.receipt, googlePurchase.purchaseToken);
+                m_GooglePurchaseCallback.NotifyDeferredPurchase(googlePurchase, googlePurchase.receipt, googlePurchase.purchaseToken);
             }
             else
             {
                 m_GooglePurchaseCallback.OnPurchaseFailed(
                     new PurchaseFailureDescription(
-                        googlePurchase.sku,
+                        googlePurchase.purchaseToken,
                         PurchaseFailureReason.Unknown,
                         GoogleBillingStrings.errorPurchaseStateUnspecified + " {M: GPUL.OPO}"
                     )
                 );
             }
         }
-        void OnDeferredProrationUpgradeDowngradeSubscriptionOk()
+
+        void HandlePurchasedProduct(IGooglePurchase googlePurchase)
         {
-            m_GooglePurchaseCallback.NotifyDeferredProrationUpgradeDowngradeSubscription(m_LastKnownProductService.GetLastKnownProductId());
+            if (IsDeferredSubscriptionChange(googlePurchase))
+            {
+                m_GooglePurchaseCallback.NotifyDeferredProrationUpgradeDowngradeSubscription(m_LastKnownProductService.LastKnownProductId);
+            }
+            else
+            {
+                m_GooglePurchaseCallback.OnPurchaseSuccessful(googlePurchase, googlePurchase.receipt, googlePurchase.purchaseToken);
+            }
         }
 
-        void OnPurchaseCanceled(GooglePurchase googlePurchase)
+        bool IsDeferredSubscriptionChange(IGooglePurchase googlePurchase)
+        {
+            return IsLastProrationModeDeferred() &&
+                   googlePurchase.sku == m_LastKnownProductService.LastKnownOldProductId;
+        }
+
+        bool IsLastProrationModeDeferred()
+        {
+            return m_LastKnownProductService.LastKnownProrationMode == GooglePlayProrationMode.Deferred;
+        }
+
+        void OnPurchaseCancelled(IGoogleBillingResult billingResult)
         {
             m_GooglePurchaseCallback.OnPurchaseFailed(
                 new PurchaseFailureDescription(
-                    googlePurchase.sku,
+                    m_LastKnownProductService.LastKnownProductId,
+                    PurchaseFailureReason.UserCancelled,
+                    billingResult.debugMessage
+                )
+            );
+        }
+
+        void OnPurchaseCancelled(IGooglePurchase googlePurchase)
+        {
+            m_GooglePurchaseCallback.OnPurchaseFailed(
+                new PurchaseFailureDescription(
+                    googlePurchase.purchaseToken,
                     PurchaseFailureReason.UserCancelled,
                     GoogleBillingStrings.errorUserCancelled
                 )
             );
         }
 
-        void OnPurchaseAlreadyOwned(GooglePurchase googlePurchase)
+        void OnPurchaseAlreadyOwned(IGooglePurchase googlePurchase)
         {
             m_GooglePurchaseCallback.OnPurchaseFailed(
                 new PurchaseFailureDescription(
-                    googlePurchase.sku,
+                    googlePurchase.purchaseToken,
                     PurchaseFailureReason.DuplicateTransaction,
                     GoogleBillingStrings.errorItemAlreadyOwned
                 )
             );
         }
 
-        void OnPurchaseFailed(GooglePurchase googlePurchase, string debugMessage)
+        void OnPurchaseFailed(IGooglePurchase googlePurchase, string debugMessage)
         {
             m_GooglePurchaseCallback.OnPurchaseFailed(
                 new PurchaseFailureDescription(
-                    googlePurchase.sku,
+                    googlePurchase.purchaseToken,
                     PurchaseFailureReason.Unknown,
                     debugMessage + " {M: GPUL.OPF}"
                 )

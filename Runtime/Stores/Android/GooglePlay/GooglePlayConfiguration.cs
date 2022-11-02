@@ -1,18 +1,22 @@
+#nullable enable
+
 using System;
 using UnityEngine.Purchasing.Extension;
 using UnityEngine.Purchasing.Interfaces;
+using UnityEngine.Purchasing.Models;
 
 namespace UnityEngine.Purchasing
 {
     /// <summary>
     /// Access Google Play store specific configurations.
     /// </summary>
-    class GooglePlayConfiguration: IGooglePlayConfiguration, IGooglePlayConfigurationInternal
+    class GooglePlayConfiguration : IGooglePlayConfiguration, IGooglePlayConfigurationInternal
     {
-        Action m_InitializationConnectionLister;
-        IGooglePlayStoreService m_GooglePlayStoreService;
-        Action<Product> m_DeferredPurchaseAction;
-        Action<Product> m_DeferredProrationUpgradeDowngradeSubscriptionAction;
+        Action? m_InitializationConnectionLister;
+        readonly IGooglePlayStoreService m_GooglePlayStoreService;
+        Action<Product>? m_DeferredPurchaseAction;
+        Action<Product>? m_DeferredProrationUpgradeDowngradeSubscriptionAction;
+        Action<int>? m_QueryProductDetailsFailedListener;
 
         bool m_FetchPurchasesAtInitialize = true;
 
@@ -41,6 +45,16 @@ namespace UnityEngine.Purchasing
             m_InitializationConnectionLister?.Invoke();
         }
 
+        public void SetQueryProductDetailsFailedListener(Action<int> action)
+        {
+            m_QueryProductDetailsFailedListener = action;
+        }
+
+        public void NotifyQueryProductDetailsFailed(int retryCount)
+        {
+            m_QueryProductDetailsFailedListener?.Invoke(retryCount);
+        }
+
         /// <summary>
         /// Set listener for deferred purchasing events.
         /// Deferred purchasing is enabled by default and cannot be changed.
@@ -51,9 +65,9 @@ namespace UnityEngine.Purchasing
             m_DeferredPurchaseAction = action;
         }
 
-        public void NotifyDeferredProrationUpgradeDowngradeSubscription(IStoreCallback storeCallback, string productId)
+        public void NotifyDeferredProrationUpgradeDowngradeSubscription(IStoreCallback? storeCallback, string productId)
         {
-            Product product = storeCallback.FindProductById(productId);
+            var product = storeCallback.FindProductById(productId);
             if (product != null)
             {
                 m_DeferredProrationUpgradeDowngradeSubscriptionAction?.Invoke(product);
@@ -65,9 +79,9 @@ namespace UnityEngine.Purchasing
             return !m_FetchPurchasesAtInitialize;
         }
 
-        public void NotifyDeferredPurchase(IStoreCallback storeCallback, string productId, string receipt, string transactionId)
+        public void NotifyDeferredPurchase(IStoreCallback? storeCallback, IGooglePurchase? purchase, string? receipt, string? transactionId)
         {
-            Product product = storeCallback.FindProductById(productId);
+            var product = storeCallback?.FindProductById(purchase?.sku);
             if (product != null)
             {
                 ProductPurchaseUpdater.UpdateProductReceiptAndTransactionID(product, receipt, transactionId, GooglePlay.Name);
@@ -100,7 +114,7 @@ namespace UnityEngine.Purchasing
         /// For more information please visit <a href="https://developer.android.com/google/play/billing/security">https://developer.android.com/google/play/billing/security</a>
         /// </summary>
         /// <param name="profileId">The obfuscated profile id</param>
-        public void SetObfuscatedProfileId(string profileId)
+        public void SetObfuscatedProfileId(string? profileId)
         {
             m_GooglePlayStoreService.SetObfuscatedProfileId(profileId);
         }

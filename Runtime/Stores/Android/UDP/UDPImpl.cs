@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using UnityEngine.Purchasing.Extension;
@@ -41,7 +41,7 @@ namespace UnityEngine.Purchasing
 
         public override void RetrieveProducts(ReadOnlyCollection<ProductDefinition> products)
         {
-            Action<bool, string> retrieveCallback = (success, json) =>
+            void retrieveCallback(bool success, string json)
             {
                 if (success && !string.IsNullOrEmpty(json))
                 {
@@ -49,9 +49,9 @@ namespace UnityEngine.Purchasing
                 }
                 else
                 {
-                    m_Logger.LogWarning("Unity IAP", "RetrieveProducts failed: " + json);
+                    m_Logger.LogIAPWarning("RetrieveProducts failed: " + json);
                 }
-            };
+            }
 
             if (!m_Initialized)
             {
@@ -68,7 +68,7 @@ namespace UnityEngine.Purchasing
                             var dic = message.HashtableFromJson();
                             if (dic.ContainsKey("Channel"))
                             {
-                                Type udpUserInfo = UserInfoInterface.GetClassType();
+                                var udpUserInfo = UserInfoInterface.GetClassType();
                                 if (udpUserInfo != null)
                                 {
                                     m_UserInfo = Activator.CreateInstance(udpUserInfo);
@@ -134,11 +134,11 @@ namespace UnityEngine.Purchasing
                         return;
                     }
 
-                    PurchaseFailureReason reason = (PurchaseFailureReason) Enum.Parse(typeof(PurchaseFailureReason),
+                    var reason = (PurchaseFailureReason)Enum.Parse(typeof(PurchaseFailureReason),
                         k_Unknown);
 
                     var reasonString = reason.ToString();
-                    var errDic = new Dictionary<string, object> {["error"] = reasonString};
+                    var errDic = new Dictionary<string, object> { ["error"] = reasonString };
 
                     if (dic.ContainsKey("purchaseInfo"))
                     {
@@ -196,16 +196,16 @@ namespace UnityEngine.Purchasing
 
         public void RegisterPurchaseDeferredListener(Action<Product> callback)
         {
-            this.m_DeferredCallback = callback;
+            m_DeferredCallback = callback;
         }
 
         public void EnableDebugLog(bool enable)
         {
-            Type storeServiceInfo = StoreServiceInterface.GetClassType();
+            var storeServiceInfo = StoreServiceInterface.GetClassType();
             if (storeServiceInfo != null)
             {
                 var enableDebugLogging = StoreServiceInterface.GetEnableDebugLoggingMethod();
-                enableDebugLogging.Invoke(null, new object[] {enable});
+                enableDebugLogging.Invoke(null, new object[] { enable });
             }
             else
             {
@@ -224,7 +224,9 @@ namespace UnityEngine.Purchasing
             foreach (var property in properties)
             {
                 if (property.PropertyType == typeof(string))
-                    property.SetValue(info, (string) dic.GetString(property.Name), null);
+                {
+                    property.SetValue(info, dic.GetString(property.Name), null);
+                }
             }
         }
 

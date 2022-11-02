@@ -22,21 +22,22 @@ namespace UnityEditor.Purchasing
         /// <summary>
         /// Add option to create a IAPButton from the Window/UnityIAP menu.
         /// </summary>
-        [MenuItem (IapMenuConsts.MenuItemRoot + "/Create IAP Button", false, 100)]
+        [MenuItem(IapMenuConsts.MenuItemRoot + "/Create IAP Button", false, 100)]
         public static void CreateUnityIAPButton()
         {
             CreateUnityIAPButtonInternal();
 
             GenericEditorMenuItemClickEventSenderHelpers.SendIapMenuAddIapButtonEvent();
+            GameServicesEventSenderHelpers.SendTopMenuCreateIapButtonEvent();
         }
 
         static void CreateUnityIAPButtonInternal()
         {
-            GameObject buttonObject = CreateButtonObject();
+            var buttonObject = CreateButtonObject();
 
             if (buttonObject)
             {
-                IAPButton iapButton = buttonObject.AddComponent<IAPButton>();
+                var iapButton = buttonObject.AddComponent<IAPButton>();
 
                 if (iapButton != null)
                 {

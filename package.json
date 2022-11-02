@@ -1,7 +1,7 @@
 {
   "name": "com.unity.purchasing",
   "displayName": "In App Purchasing",
-  "unity": "2019.4",
+  "unity": "2020.3",
   "_upm": {
     "gameService": {
       "groupIndex": 4,
@@ -14,7 +14,7 @@
       "iOS"
     ]
   },
-  "version": "4.1.2",
+  "version": "4.5.1",
   "description": "IMPORTANT UPGRADE NOTES:\n\nIf updating from Unity IAP (com.unity.purchasing + the Asset Store plugin) versions 2.x to version 3.x, complete the following actions in order to resolve compilation errors:\n 1. Move IAPProductCatalog.json and BillingMode.json\n\tFROM: Assets/Plugins/UnityPurchasing/Resources/\n\tTO: Assets/Resources/.\n 2. Move AppleTangle.cs and GooglePlayTangle.cs\n\tFROM: Assets/Plugins/UnityPurchasing/generated\n\tTO: Assets/Scripts/UnityPurchasing/generated.\n 3. Remove all remaining Asset Store plugin folders and files in Assets/Plugins/UnityPurchasing from your project.\n\nPACKAGE DESCRIPTION:\n\nWith Unity IAP, setting up in-app purchases for your game across multiple app stores has never been easier.\n\nThis package provides:\n\n ▪ One common API to access all stores for free so you can fully understand and optimize your in-game economy\n ▪ Automatic coupling with Unity Analytics to enable monitoring and decision-making based on trends in your revenue and purchase data across multiple platforms\n ▪ Support for iOS, Mac, tvOS, Google Play, Windows, and Amazon app stores(*).\n ▪ Support to work with the Unity Distribution Portal to synchronize catalogs and transactions with other app stores\n ▪ Client-side receipt validation for Apple App Store and Google Play\n\nAfter installing this package, open the Services Window to enable In-App Purchasing to use these features.",
   "dependencies": {
     "com.unity.ugui": "1.0.0",
@@ -22,7 +22,8 @@
     "com.unity.modules.unitywebrequest": "1.0.0",
     "com.unity.modules.jsonserialize": "1.0.0",
     "com.unity.modules.androidjni": "1.0.0",
-    "com.unity.services.core": "1.0.1"
+    "com.unity.services.core": "1.3.1",
+    "com.unity.services.analytics": "4.0.1"
   },
   "keywords": [
     "purchasing",
@@ -32,15 +33,15 @@
   "license": "Unity Companion Package License v1.0",
   "hideInEditor": false,
   "relatedPackages": {
-    "com.unity.purchasing.tests": "4.1.2"
+    "com.unity.purchasing.tests": "4.5.1"
   },
   "upmCi": {
-    "footprint": "14114633bfbea462e56753c8d262560ce47c6d5d"
+    "footprint": "bfa3c3fe856a3713d41034c9eb9b81a8ac896f44"
   },
   "repository": {
     "url": "https://github.cds.internal.unity3d.com/unity/com.unity.purchasing.git",
     "type": "git",
-    "revision": "c73a3b5ce4e0a8eb429214ad6702ceb8ece5fabe"
+    "revision": "0e6a0e037cbfe72c55e5eff3c186ef29484f6636"
   },
   "samples": [
     {
@@ -67,6 +68,11 @@
       "displayName": "05 Local Receipt Validation",
       "description": "This sample showcases how to use the cross-platform validator to do local receipt validation with the Google Play Store and Apple App Store.",
       "path": "Samples~/05 LocalReceiptValidation"
+    },
+    {
+      "displayName": "06 Initialize Unity Gaming Services",
+      "description": "This sample showcases how to initialize Unity Gaming Services using the Services Core API",
+      "path": "Samples~/06 InitializeGamingServices"
     },
     {
       "displayName": "Apple App Store - 01 Refreshing App Receipts",
@@ -117,6 +123,11 @@
       "displayName": "Apple App Store - 10 Can Make Payments",
       "description": "This sample shows how to check whether the logged-in player is permitted to purchase from the Apple App Store on this device.",
       "path": "Samples~/Apple App Store - 10 CanMakePayments"
+    },
+    {
+      "displayName": "Apple App Store - 11 Family Sharing",
+      "description": "This sample showcases how to use Unity IAP to manage family shared purchases.",
+      "path": "Samples~/Apple App Store - 11 FamilySharing"
     },
     {
       "displayName": "Apple App Store - 12 Upgrading and Downgrading Subscriptions",

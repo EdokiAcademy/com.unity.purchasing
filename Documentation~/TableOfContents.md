@@ -8,7 +8,10 @@
         * [Overview](DefiningProductsOverview.md)
         * [Coded](DefiningProductsCoded.md)
         * [IAP Catalog](UnityIAPDefiningProducts.md)
-    * [Initialize IAP](UnityIAPInitialization.md)
+    * Initialization
+      * [Overview](InitializationOverview.md)
+      * [Initialize Unity Gaming Services](UnityIAPInitializeUnityGamingServices.md)
+      * [Initialize IAP](UnityIAPInitialization.md)
     * [Fetching Additional Products](UnityIAPFetchingProductsIncrementally.md)
     * Creating a Purchasing Button
         * [Browsing Product Metadata](UnityIAPBrowsingMetadata.md)
@@ -44,6 +47,7 @@
         * [Extensions and Configuration](UnityIAPiOSMAS.md)
         * [Purchase Receipt](AppleReceipt.md)
         * [Testing](AppleTesting.md)
+        * [Family Sharing](UnityIAPAppleFamilySharing.md)
     * Microsoft Store (UWP)
         * [How to Set Up](UnityIAPWindowsConfiguration.md)
         * [Purchase Receipt](MicrosoftReceipt.md)

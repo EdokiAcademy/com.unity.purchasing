@@ -23,19 +23,21 @@ namespace UnityEditor.Purchasing
         /// <summary>
         /// Add option to create a IAPListener from the Window/UnityIAP menu.
         /// </summary>
-        [MenuItem (IapMenuConsts.MenuItemRoot + "/Create IAP Listener", false, 100)]
+        [MenuItem(IapMenuConsts.MenuItemRoot + "/Create IAP Listener", false, 100)]
         public static void CreateUnityIAPListener()
         {
             CreateUnityIAPListenerInternal();
 
             GenericEditorMenuItemClickEventSenderHelpers.SendIapMenuAddIapListenerEvent();
+            GameServicesEventSenderHelpers.SendTopMenuCreateIapListenerEvent();
         }
 
         static void CreateUnityIAPListenerInternal()
         {
-            GameObject listenerObject = CreateListenerObject();
+            var listenerObject = CreateListenerObject();
 
-            if (listenerObject) {
+            if (listenerObject)
+            {
                 listenerObject.AddComponent<IAPListener>();
                 listenerObject.name = "IAP Listener";
             }
