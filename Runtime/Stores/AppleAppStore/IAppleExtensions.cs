@@ -13,7 +13,16 @@ namespace UnityEngine.Purchasing
         /// This requires an Internet connection and will prompt the user for their credentials.
         /// </summary>
         /// <param name="successCallback">This action will be called when the refresh is successful. The receipt will be passed through.</param>
+        /// <param name="errorCallback">This action will be called when the refresh is in error. The error's details will be passed through.</param>
+        void RefreshAppReceipt(Action<string> successCallback, Action<string> errorCallback);
+
+        /// <summary>
+        /// Fetch the latest App Receipt from Apple.
+        /// This requires an Internet connection and will prompt the user for their credentials.
+        /// </summary>
+        /// <param name="successCallback">This action will be called when the refresh is successful. The receipt will be passed through.</param>
         /// <param name="errorCallback">This action will be called when the refresh is in error.</param>
+        [Obsolete("RefreshAppReceipt(Action<string> successCallback, Action errorCallback) is deprecated, please use RefreshAppReceipt(Action<string> successCallback, Action<string> errorCallback) instead.")]
         void RefreshAppReceipt(Action<string> successCallback, Action errorCallback);
 
         /// <summary>
@@ -28,7 +37,14 @@ namespace UnityEngine.Purchasing
         /// Initiate a request to Apple to restore previously made purchases.
         /// </summary>
         /// <param name="callback">Action will be called when the request to Apple comes back. The bool will be true if it was successful or false if it was not.</param>
+        [Obsolete("RestoreTransactions(Action<bool> callback) is deprecated, please use RestoreTransactions(Action<bool, string> callback) instead.")]
         void RestoreTransactions(Action<bool> callback);
+
+        /// <summary>
+        /// Initiate a request to Apple to restore previously made purchases.
+        /// </summary>
+        /// <param name="callback">Action will be called when the request to Apple comes back. The bool will be true if it was successful with a null string or false if it was not with the error message in the string.</param>
+        void RestoreTransactions(Action<bool, string> callback);
 
         /// <summary>
         /// Called when a processing a purchase from Apple that is in the "onProductPurchaseDeferred" state.

@@ -2,11 +2,12 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Purchasing;
+using UnityEngine.Purchasing.Extension;
 using UnityEngine.UI;
 
 namespace Samples.Purchasing.Core.FetchingAdditionalProducts
 {
-    public class FetchingAdditionalProducts : MonoBehaviour, IStoreListener
+    public class FetchingAdditionalProducts : MonoBehaviour, IDetailedStoreListener
     {
         IStoreController m_StoreController;
 
@@ -66,9 +67,16 @@ namespace Samples.Purchasing.Core.FetchingAdditionalProducts
 
                     fetchAdditionalProductsButton.interactable = false;
                 },
-                reason =>
+                (reason, message) =>
                 {
-                    Debug.Log($"Fetching additional products failed: {reason.ToString()}");
+                    var errorMessage = $"Fetching additional products failed: {reason.ToString()}.";
+
+                    if (message != null)
+                    {
+                        errorMessage += $" More details: {message}";
+                    }
+
+                    Debug.LogError(errorMessage);
                 });
         }
 
@@ -90,7 +98,19 @@ namespace Samples.Purchasing.Core.FetchingAdditionalProducts
 
         public void OnInitializeFailed(InitializationFailureReason error)
         {
-            Debug.Log($"In-App Purchasing initialize failed: {error}");
+            OnInitializeFailed(error, null);
+        }
+
+        public void OnInitializeFailed(InitializationFailureReason error, string message)
+        {
+            var errorMessage = $"Purchasing failed to initialize. Reason: {error}.";
+
+            if (message != null)
+            {
+                errorMessage += $" More details: {message}";
+            }
+
+            Debug.Log(errorMessage);
         }
 
         public PurchaseProcessingResult ProcessPurchase(PurchaseEventArgs args)
@@ -117,6 +137,13 @@ namespace Samples.Purchasing.Core.FetchingAdditionalProducts
         public void OnPurchaseFailed(Product product, PurchaseFailureReason failureReason)
         {
             Debug.Log($"Purchase failed - Product: '{product.definition.id}', PurchaseFailureReason: {failureReason}");
+        }
+
+        public void OnPurchaseFailed(Product product, PurchaseFailureDescription failureDescription)
+        {
+            Debug.Log($"Purchase failed - Product: '{product.definition.id}'," +
+                $" Purchase failure reason: {failureDescription.reason}," +
+                $" Purchase failure details: {failureDescription.message}");
         }
 
         void AddGold()

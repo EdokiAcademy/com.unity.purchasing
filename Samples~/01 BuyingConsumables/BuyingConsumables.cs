@@ -1,12 +1,12 @@
 using System;
 using UnityEngine;
 using UnityEngine.Purchasing;
-using UnityEngine.Serialization;
+using UnityEngine.Purchasing.Extension;
 using UnityEngine.UI;
 
 namespace Samples.Purchasing.Core.BuyingConsumables
 {
-    public class BuyingConsumables : MonoBehaviour, IStoreListener
+    public class BuyingConsumables : MonoBehaviour, IDetailedStoreListener
     {
         IStoreController m_StoreController; // The Unity Purchasing system.
 
@@ -55,7 +55,19 @@ namespace Samples.Purchasing.Core.BuyingConsumables
 
         public void OnInitializeFailed(InitializationFailureReason error)
         {
-            Debug.Log($"In-App Purchasing initialize failed: {error}");
+            OnInitializeFailed(error, null);
+        }
+
+        public void OnInitializeFailed(InitializationFailureReason error, string message)
+        {
+            var errorMessage = $"Purchasing failed to initialize. Reason: {error}.";
+
+            if (message != null)
+            {
+                errorMessage += $" More details: {message}";
+            }
+
+            Debug.Log(errorMessage);
         }
 
         public PurchaseProcessingResult ProcessPurchase(PurchaseEventArgs args)
@@ -82,6 +94,13 @@ namespace Samples.Purchasing.Core.BuyingConsumables
         public void OnPurchaseFailed(Product product, PurchaseFailureReason failureReason)
         {
             Debug.Log($"Purchase failed - Product: '{product.definition.id}', PurchaseFailureReason: {failureReason}");
+        }
+
+        public void OnPurchaseFailed(Product product, PurchaseFailureDescription failureDescription)
+        {
+            Debug.Log($"Purchase failed - Product: '{product.definition.id}'," +
+                $" Purchase failure reason: {failureDescription.reason}," +
+                $" Purchase failure details: {failureDescription.message}");
         }
 
         void AddGold()

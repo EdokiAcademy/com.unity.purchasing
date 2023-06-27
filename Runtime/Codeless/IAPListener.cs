@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine.Events;
+using UnityEngine.Purchasing.Extension;
 using UnityEngine.UI;
 
 namespace UnityEngine.Purchasing
@@ -10,9 +11,17 @@ namespace UnityEngine.Purchasing
     /// </summary>
     /// <seealso cref="CodelessIAPStoreListener"/>
     [AddComponentMenu("In-App Purchasing/IAP Listener")]
-    [HelpURL("https://docs.unity3d.com/Manual/UnityIAP.html")]
+    [HelpURL("https://docs.unity3d.com/Packages/com.unity.purchasing@latest")]
     public class IAPListener : MonoBehaviour
     {
+        /// <summary>
+        /// Type of event fired after a successful fetching the products from the store.
+        /// </summary>
+        [System.Serializable]
+        public class OnProductsFetchedEvent : UnityEvent<ProductCollection>
+        {
+        };
+
         /// <summary>
         /// Type of event fired after a successful purchase of a product.
         /// </summary>
@@ -30,6 +39,14 @@ namespace UnityEngine.Purchasing
         };
 
         /// <summary>
+        /// Type of event fired after a failed purchase of a product.
+        /// </summary>
+        [System.Serializable]
+        public class OnPurchaseDetailedFailedEvent : UnityEvent<Product, PurchaseFailureDescription>
+        {
+        };
+
+        /// <summary>
         /// Consume successful purchases immediately.
         /// </summary>
         [Tooltip("Consume successful purchases immediately.")]
@@ -42,6 +59,12 @@ namespace UnityEngine.Purchasing
         public bool dontDestroyOnLoad = true;
 
         /// <summary>
+        /// Event fired after a successful fetching the products from the store.
+        /// </summary>
+        [Tooltip("Event fired after a successful fetching the products from the store.")]
+        public OnProductsFetchedEvent onProductsFetched;
+
+        /// <summary>
         /// Event fired after a successful purchase of this product.
         /// </summary>
         [Tooltip("Event fired after a successful purchase of this product.")]
@@ -52,6 +75,12 @@ namespace UnityEngine.Purchasing
         /// </summary>
         [Tooltip("Event fired after a failed purchase of this product.")]
         public OnPurchaseFailedEvent onPurchaseFailed;
+
+        /// <summary>
+        /// Event fired after a failed purchase of this product.
+        /// </summary>
+        [Tooltip("Event fired after a failed purchase of this product.")]
+        public OnPurchaseDetailedFailedEvent onPurchaseDetailedFailedEvent;
 
         void OnEnable()
         {
@@ -89,5 +118,16 @@ namespace UnityEngine.Purchasing
         {
             onPurchaseFailed.Invoke(product, reason);
         }
+
+        /// <summary>
+        /// Invoked on a failed purchase a product
+        /// </summary>
+        /// <param name="product">The <typeparamref name="Product"/> which failed to purchase</param>
+        /// <param name="description">Information to help developers recover from this failure</param>
+        public void OnPurchaseFailed(Product product, PurchaseFailureDescription description)
+        {
+            onPurchaseDetailedFailedEvent.Invoke(product, description);
+        }
+
     }
 }

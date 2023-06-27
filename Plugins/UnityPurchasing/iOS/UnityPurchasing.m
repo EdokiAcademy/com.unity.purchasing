@@ -27,7 +27,7 @@ void UnityPurchasingLog(NSString *format, ...)
 
 @implementation ReceiptRefresher
 
-- (id)initWithCallback:(void (^)(BOOL))callbackBlock
+- (id)initWithCallback:(void (^)(BOOL, NSString*))callbackBlock
 {
     self.callback = callbackBlock;
     return [super init];
@@ -35,12 +35,13 @@ void UnityPurchasingLog(NSString *format, ...)
 
 - (void)requestDidFinish:(SKRequest *)request
 {
-    self.callback(true);
+    self.callback(true, NULL);
 }
 
 - (void)request:(SKRequest *)request didFailWithError:(NSError *)error
 {
-    self.callback(false);
+    NSString* errorMessage = [NSString stringWithFormat: @"Error code: %ld, error description: %@", error.code, error.description];
+    self.callback(false, errorMessage);
 }
 
 @end
@@ -114,17 +115,17 @@ int delayInSeconds = 2;
 
 - (void)UnitySendMessage:(NSString*)subject payload:(NSString*)payload
 {
-    messageCallback(subject.UTF8String, payload.UTF8String, @"".UTF8String, @"".UTF8String);
+    messageCallback(subject.UTF8String, payload.UTF8String, @"".UTF8String, @"".UTF8String, @"".UTF8String, false);
 }
 
 - (void)UnitySendMessage:(NSString*)subject payload:(NSString*)payload receipt:(NSString*)receipt
 {
-    messageCallback(subject.UTF8String, payload.UTF8String, receipt.UTF8String, @"".UTF8String);
+    messageCallback(subject.UTF8String, payload.UTF8String, receipt.UTF8String, @"".UTF8String, @"".UTF8String, false);
 }
 
-- (void)UnitySendMessage:(NSString*)subject payload:(NSString*)payload receipt:(NSString*)receipt transactionId:(NSString*)transactionId
+- (void)UnitySendMessage:(NSString*)subject payload:(NSString*)payload receipt:(NSString*)receipt transactionId:(NSString*)transactionId originalTransactionId:(NSString*)originalTransactionId isRestored:(Boolean)isRestored
 {
-    messageCallback(subject.UTF8String, payload.UTF8String, receipt.UTF8String, transactionId.UTF8String);
+    messageCallback(subject.UTF8String, payload.UTF8String, receipt.UTF8String, transactionId.UTF8String, originalTransactionId.UTF8String, isRestored);
 }
 
 - (void)setCallback:(UnityPurchasingCallback)callback
@@ -177,15 +178,16 @@ int delayInSeconds = 2;
     }
     #endif
 
-    self.receiptRefresher = [[ReceiptRefresher alloc] initWithCallback:^(BOOL success) {
-        UnityPurchasingLog(@"RefreshReceipt status %d", success);
+    self.receiptRefresher = [[ReceiptRefresher alloc] initWithCallback:^(BOOL success, NSString* errorMessage) {
         if (success)
         {
+            UnityPurchasingLog(@"RefreshReceipt status %d", success);
             [self UnitySendMessage: @"onAppReceiptRefreshed" payload: [self getAppReceipt]];
         }
         else
         {
-            [self UnitySendMessage: @"onAppReceiptRefreshFailed" payload: nil];
+            UnityPurchasingLog(@"RefreshReceipt status %d - Error message: %@", success, errorMessage);
+            [self UnitySendMessage: @"onAppReceiptRefreshFailed" payload: errorMessage];
         }
     }];
     self.refreshRequest = [[SKReceiptRefreshRequest alloc] init];
@@ -194,9 +196,10 @@ int delayInSeconds = 2;
 }
 
 // Handle a new or restored purchase transaction by informing Unity.
-- (void)onTransactionSucceeded:(SKPaymentTransaction*)transaction
+- (void)onTransactionSucceeded:(SKPaymentTransaction*)transaction isRestored:(Boolean)isRestored
 {
     NSString* transactionId = transaction.transactionIdentifier;
+    NSString* originalTransactionId = transaction.originalTransaction.transactionIdentifier;
 
     // This should never happen according to Apple's docs, but it does!
     if (nil == transactionId)
@@ -221,16 +224,19 @@ int delayInSeconds = 2;
         [pendingTransactions setObject: transaction forKey: transactionId];
     }
 
-    [self UnitySendMessage: @"OnPurchaseSucceeded" payload: transaction.payment.productIdentifier receipt: [self selectReceipt: transaction] transactionId: transactionId];
+    [self UnitySendMessage: @"OnPurchaseSucceeded" payload: transaction.payment.productIdentifier receipt: [self selectReceipt: transaction] transactionId: transactionId originalTransactionId: originalTransactionId isRestored: isRestored];
 }
 
-// Called back by managed code when the tranaction has been logged.
-- (void)finishTransaction:(NSString *)transactionIdentifier
+// Called back by managed code when the transaction has been logged.
+- (void)finishTransaction:(NSString *)transactionIdentifier hasProduct:(Boolean)hasProduct
 {
     SKPaymentTransaction* transaction = [pendingTransactions objectForKey: transactionIdentifier];
     if (nil != transaction)
     {
-        UnityPurchasingLog(@"Finishing transaction %@", transactionIdentifier);
+        if (hasProduct)
+        {
+            UnityPurchasingLog(@"Finishing transaction %@", transactionIdentifier);
+        }
         [[SKPaymentQueue defaultQueue] finishTransaction: transaction]; // If this fails (user not logged into the store?), transaction is already removed from pendingTransactions, so future calls to finishTransaction will not retry
         [pendingTransactions removeObjectForKey: transactionIdentifier];
         [finishedTransactions addObject: transactionIdentifier];
@@ -571,7 +577,7 @@ int delayInSeconds = 2;
 
     if (product != nil)
     {
-        [self onTransactionSucceeded: transaction];
+        [self onTransactionSucceeded: transaction isRestored: false];
     }
 }
 
@@ -579,7 +585,7 @@ int delayInSeconds = 2;
 {
     if (product != nil)
     {
-        [self onTransactionSucceeded: transaction];
+        [self onTransactionSucceeded: transaction isRestored: true];
     }
 }
 
@@ -1156,8 +1162,9 @@ void unityPurchasingFinishTransaction(const char* productJSON, const char* trans
 {
     if (transactionId == NULL)
         return;
+    Boolean hasProduct = productJSON != NULL;
     NSString* tranId = [NSString stringWithUTF8String: transactionId];
-    [UnityPurchasing_getInstance() finishTransaction: tranId];
+    [UnityPurchasing_getInstance() finishTransaction: tranId hasProduct: hasProduct];
 }
 
 void unityPurchasingRestoreTransactions()

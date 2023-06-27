@@ -1,4 +1,5 @@
-using System.Collections.Generic;
+#nullable enable
+using UnityEngine.Purchasing.Extension;
 
 namespace UnityEngine.Purchasing
 {
@@ -23,21 +24,33 @@ namespace UnityEngine.Purchasing
             m_ForwardTo.OnInitialized(controller, m_Extensions);
         }
 
-        public void OnInitializeFailed(InitializationFailureReason error)
+        public void OnInitializeFailed(InitializationFailureReason error, string? message)
         {
-            m_ForwardTo.OnInitializeFailed(error);
+            m_ForwardTo.OnInitializeFailed(error, message);
         }
 
         public PurchaseProcessingResult ProcessPurchase(PurchaseEventArgs e)
         {
-            m_Analytics.OnPurchaseSucceeded(e.purchasedProduct);
             return m_ForwardTo.ProcessPurchase(e);
         }
 
-        public void OnPurchaseFailed(Product i, PurchaseFailureReason p)
+        public void OnPurchaseFailed(Product i, PurchaseFailureDescription p)
         {
             m_Analytics.OnPurchaseFailed(i, p);
-            m_ForwardTo.OnPurchaseFailed(i, p);
+            if (m_ForwardTo is IDetailedStoreListener listener)
+            {
+                listener.OnPurchaseFailed(i, p);
+            }
+            else
+            {
+#pragma warning disable 0618
+                m_ForwardTo.OnPurchaseFailed(i, p.reason);
+            }
+        }
+
+        public void SendTransactionEvent(Product product)
+        {
+            m_Analytics.OnPurchaseSucceeded(product);
         }
     }
 }

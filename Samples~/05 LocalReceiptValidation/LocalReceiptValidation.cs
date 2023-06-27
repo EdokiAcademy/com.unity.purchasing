@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Purchasing;
+using UnityEngine.Purchasing.Extension;
 using UnityEngine.Purchasing.Security;
 using UnityEngine.UI;
 
@@ -51,7 +52,7 @@ namespace Samples.Purchasing.Core.LocalReceiptValidation
         {
             var currentAppStore = StandardPurchasingModule.Instance().appStore;
             return currentAppStore == AppStore.AppleAppStore ||
-                   currentAppStore == AppStore.MacAppStore;
+                currentAppStore == AppStore.MacAppStore;
         }
 
         void InitializePurchasing()
@@ -87,12 +88,31 @@ namespace Samples.Purchasing.Core.LocalReceiptValidation
 
         public void OnInitializeFailed(InitializationFailureReason error)
         {
-            Debug.Log($"In-App Purchasing initialize failed: {error}");
+            OnInitializeFailed(error, null);
+        }
+
+        public void OnInitializeFailed(InitializationFailureReason error, string message)
+        {
+            var errorMessage = $"Purchasing failed to initialize. Reason: {error}.";
+
+            if (message != null)
+            {
+                errorMessage += $" More details: {message}";
+            }
+
+            Debug.Log(errorMessage);
         }
 
         public void OnPurchaseFailed(Product product, PurchaseFailureReason failureReason)
         {
             Debug.Log($"Purchase failed - Product: '{product.definition.id}', PurchaseFailureReason: {failureReason}");
+        }
+
+        public void OnPurchaseFailed(Product product, PurchaseFailureDescription failureDescription)
+        {
+            Debug.Log($"Purchase failed - Product: '{product.definition.id}'," +
+                $" Purchase failure reason: {failureDescription.reason}," +
+                $" Purchase failure details: {failureDescription.message}");
         }
 
         public void BuyGold()
@@ -130,9 +150,11 @@ namespace Samples.Purchasing.Core.LocalReceiptValidation
                 try
                 {
                     var result = m_Validator.Validate(product.receipt);
+
                     //The validator returns parsed receipts.
                     LogReceipts(result);
                 }
+
                 //If the purchase is deemed invalid, the validator throws an IAPSecurityException.
                 catch (IAPSecurityException reason)
                 {
@@ -175,21 +197,21 @@ namespace Samples.Purchasing.Core.LocalReceiptValidation
         static void LogReceipt(IPurchaseReceipt receipt)
         {
             Debug.Log($"Product ID: {receipt.productID}\n" +
-                      $"Purchase Date: {receipt.purchaseDate}\n" +
-                      $"Transaction ID: {receipt.transactionID}");
+                $"Purchase Date: {receipt.purchaseDate}\n" +
+                $"Transaction ID: {receipt.transactionID}");
 
             if (receipt is GooglePlayReceipt googleReceipt)
             {
                 Debug.Log($"Purchase State: {googleReceipt.purchaseState}\n" +
-                          $"Purchase Token: {googleReceipt.purchaseToken}");
+                    $"Purchase Token: {googleReceipt.purchaseToken}");
             }
 
             if (receipt is AppleInAppPurchaseReceipt appleReceipt)
             {
                 Debug.Log($"Original Transaction ID: {appleReceipt.originalTransactionIdentifier}\n" +
-                          $"Subscription Expiration Date: {appleReceipt.subscriptionExpirationDate}\n" +
-                          $"Cancellation Date: {appleReceipt.cancellationDate}\n" +
-                          $"Quantity: {appleReceipt.quantity}");
+                    $"Subscription Expiration Date: {appleReceipt.subscriptionExpirationDate}\n" +
+                    $"Cancellation Date: {appleReceipt.cancellationDate}\n" +
+                    $"Quantity: {appleReceipt.quantity}");
             }
         }
 

@@ -1,3 +1,5 @@
+#nullable enable
+using UnityEngine.Purchasing.Extension;
 using System;
 
 namespace UnityEngine.Purchasing
@@ -10,7 +12,7 @@ namespace UnityEngine.Purchasing
         /// <summary>
         /// Purchasing failed to initialise for a non recoverable reason.
         /// </summary>
-        void OnInitializeFailed(InitializationFailureReason error);
+        void OnInitializeFailed(InitializationFailureReason error, string? message = null);
 
         /// <summary>
         /// A purchase succeeded.
@@ -20,7 +22,7 @@ namespace UnityEngine.Purchasing
         /// <summary>
         /// A purchase failed with specified reason.
         /// </summary>
-        void OnPurchaseFailed(Product i, PurchaseFailureReason p);
+        void OnPurchaseFailed(Product i, PurchaseFailureDescription p);
 
         /// <summary>
         /// Purchasing initialized successfully.
@@ -31,5 +33,7 @@ namespace UnityEngine.Purchasing
         /// Initialized products will include receipts, if currently owned.
         /// </summary>
         void OnInitialized(IStoreController controller);
+
+        void SendTransactionEvent(Product product);
     }
 }

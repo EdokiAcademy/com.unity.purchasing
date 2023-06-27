@@ -1,5 +1,79 @@
 # Changelog
 
+## [4.9.3] - 2023-05-17
+### Changed
+- Analytics events are now sent when a purchase has been confirmed (`ConfirmPendingTransaction` or `ProcessPurchase` returning `PurchaseProcessingResult.Complete`). This will improve the accuracy of revenue tracking by no longer considering pending purchases.
+- Updated `Product.transactionID`, `Product.hasReceipt` and `Product.receipt` documentation to include pending transaction use cases.
+- Updated samples to use `IDetailedStoreListener` and its improved `OnPurchaseFailed` callback.
+- Added a new `RefreshAppReceipt(Action<string> successCallback, Action<string> errorCallback)` callback containing more information when the errorCallback is invoked in `IAppleExtensions : IStoreListener`.
+
+### Fixed
+- `OnPurchaseFailed` will no longer log an error when there's only new IAP Buttons with no IAP Listener.
+- Apple - Improved the accuracy of `Product.appleProductIsRestored` when using the restore transaction button. These will now correctly be flagged as true.
+- Codeless - `OnPurchaseFailed(Product, PurchaseFailureDescription)` callback was not invoked in `IAP Listener`
+
+## [4.8.0] - 2023-04-12
+### Added
+- Added new [IAP Button](https://docs.unity3d.com/Packages/com.unity.purchasing@4.8/manual/CodelessIAPButton.html) in the editor. This new button allows for more UI customization.  The new button will no longer update the button fields by default.
+- Added a new event `OnProductFetched(Product)` to the [IAP Listener](https://docs.unity3d.com/Packages/com.unity.purchasing@4.8/manual/IAPListener.html) and to the [IAP Button](https://docs.unity3d.com/Packages/com.unity.purchasing@4.8/manual/CodelessIAPButton.html) it is called after fetching products from the app stores.
+- Added a new `OnPurchaseFailed(Product, PurchaseFailureDescription)` callback containing more information on the failed purchase in `IDetailedStoreListener : IStoreListener`
+
+### Changed
+- [IAP Button](https://docs.unity3d.com/Packages/com.unity.purchasing@4.8/manual/IAPButton.html) is now obsolete.
+- Google Play - Billing Library update from version 4.0.0 to 5.1.0 [Google Release Notes](https://developer.android.com/google/play/billing/release-notes).
+    New Google Billing features are not supported yet, they will be included in a future major update.
+- Removed the nullable operator `?` from public interfaces and classes.
+- `IStoreListener.OnPurchaseFailed` is now obsolete.
+- When present, Analytics 4.4.0 and above will now use the new interface `IAnalyticsStandardEventComponent` from Services Cores 1.8.1.
+- Upgraded `com.unity.services.core` from 1.5.2 to 1.8.1.
+
+### Fixed
+- Samples - Some samples had IAP 4.6.0 `IStoreListener` changes not completely implemented causing compilation errors.
+
+## [4.7.0] - 2023-02-09
+### Added
+- Added `storeSpecificErrorCode` to `PurchaseFailureDescription.message` when available.
+
+### Fixed
+- Unity IAP will consider the call to `UnityPurchasing.initialize` completed before invoking the correct callback `IStoreListener.OnInitialized` or `IStoreListener.OnInitializeFailed`. This prevents these callbacks from being invoked more than once per initialization.
+- GooglePlay - Fixed `No such proxy method` exception in our representation of `BillingClientStateListener.onBillingServiceDisconnected()` introduced by Unity IAP 4.6.0
+- Apple - Fixed a `NullReferenceException` happening when the receipt isn't found.
+
+### Changed
+- Removed `com.unity.services.analytics` from the IAP SDK dependencies
+
+## [4.6.0] - 2023-02-02
+### Added
+- Added a new restore transaction callback `RestoreTransactions(Action<bool, string> callback)` to obtain the error string when RestoreTransactions is not successful (`IAppleExtensions` and `IGooglePlayStoreExtensions`).
+- Added a new initialize failed callback `IStoreListener.OnInitializeFailed(InitializationFailureReason, string)` to obtain the error string when OnInitializeFailed is invoked.
+- Added a new setup failed callback `IStoreCallback.OnSetupFailed(InitializationFailureReason, string)` to obtain the error string when OnSetupFailed is invoked.
+- Added a new FetchAdditionalProducts. The failCallback contains an error string. `IStoreController.FetchAdditionalProducts(HashSet<ProductDefinition>, Action, Action<InitializationFailureReason, string>)`
+- Apple - `Product.appleOriginalTransactionId` : Returns the original transaction ID. This field is only available when the purchase was made in the active session.
+- Apple - `Product.appleProductIsRestored` : Indicates whether the product has been restored.
+- GooglePlay - `IGooglePlayConfiguration.SetFetchPurchasesExcludeDeferred(bool exclude)` has been added to revert to the previous behaviour. This is not recommended and should only be used if `Deferred` purchases are handled in your `IStoreListener.ProcessPurchase`.
+- GooglePlay - `IGooglePlayStoreExtensions.GetPurchaseState(Product product)` has been added to obtain the `GooglePurchaseState` of a product.
+- GooglePlay - Added missing values to `GoogleBillingResponseCode` in order to output it in `PurchaseFailureDescription`'s message when available.
+- Codeless - Added to the [IAP Button](https://docs.unity3d.com/Packages/com.unity.purchasing@4.6/manual/IAPButton.html) the option to add a script for the On Transactions Restored: `void OnTransactionsRestored(bool success, string? error)`
+
+### Changed
+- Upgraded `com.unity.services.core` from 1.3.1 to 1.5.2
+- Upgraded `com.unity.services.analytics` from 4.0.1 to 4.2.0
+- The old OnInitializeFailed `OnInitializeFailed(InitializationFailureReason error)` was marked `Obsolete`
+- The old OnSetupFailed `OnSetupFailed(InitializationFailureReason reason)` was marked `Obsolete`
+- The old FetchAdditionalProducts `FetchAdditionalProducts(HashSet<ProductDefinition> additionalProducts, Action successCallback, Action<InitializationFailureReason> failCallback)` was marked `Obsolete`
+- The old restore transaction callback `RestoreTransactions(Action<bool> callback)` was marked `Obsolete` (`IAppleExtensions` and `IGooglePlayStoreExtensions`).
+- Apple - Transactions received from Apple that are invalid (where the product is not entitled) will no longer output the `Finishing transaction` log. This only affects transactions that never reached the `ProcessPurchase`.
+- GooglePlay - The enum `GooglePurchaseState` now recognizes `4` as `Deferred`.
+
+### Fixed
+- Analytics - A ServicesInitializationException introduced in Analytics 4.3.0 is now handled properly.
+- Analytics - Fixed an issue where transactions events were invalidated when there was no localization data for a product.
+- GooglePlay - Fixed a `NullReferenceException` when querying sku details while the BillingClient is not ready.
+- GooglePlay - Fixed [Application Not Responding (ANR)](https://developer.android.com/topic/performance/vitals/anr) when foregrounding the application while disconnected from the Google Play Store.
+- GooglePlay - Limited the occurence of `PurchasingUnavailable` errors when retrieving products while in a disconnected state to once per connection.
+- GooglePlay - `Deferred` purchases are, by default, no longer sent to `IStoreListener.ProcessPurchase` when fetching purchases. This avoids the possibility of granting products that were not paid for. These purchases will only be processed once they become `Purchased`. This can be reverted with `IGooglePlayConfiguration.SetFetchPurchasesExcludeDeferred(bool exclude)` to not exclude them, but `Deferred` purchases will need to be handled in `IStoreListener.ProcessPurchase`.
+- Unity IAP will consider the call to `UnityPurchasing.initialize` completed before invoking the correct callback `IStoreListener.OnInitialized` or `IStoreListener.OnInitializeFailed`. This prevents these callbacks from being invoked more than once per initialization.
+
 ## [4.5.2] - 2022-10-28
 ### Fixed
 - Removed unused exception variable causing a compiler warning CS0168.
