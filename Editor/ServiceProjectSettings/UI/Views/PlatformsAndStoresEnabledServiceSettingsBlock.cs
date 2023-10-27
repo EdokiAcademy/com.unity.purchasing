@@ -11,7 +11,7 @@ namespace UnityEditor.Purchasing
     {
         IMGUIContainerPopupAdapter currentStoreTargetContainer { get; set; }
 
-        protected override void FinalizeSetupPlatformAndStoresBlock()
+        internal PlatformsAndStoresEnabledServiceSettingsBlock()
         {
             RegisterOnTargetChange();
         }
@@ -80,9 +80,9 @@ namespace UnityEditor.Purchasing
             };
         }
 
-        void OnCurrentStoreTargetChanged(string storeName)
+        void OnCurrentStoreTargetChanged(string e)
         {
-            var store = storeName.ToAppStoreFromDisplayName();
+            var store = e.ToAppStoreFromDisplayName();
 
             if (store.IsAndroid())
             {
@@ -150,7 +150,7 @@ namespace UnityEditor.Purchasing
         {
             var tagContainer = GetClearedTagContainer(baseElement);
 
-            tagContainer?.Add(MakePlatformStoreTag(platform));
+            tagContainer.Add(MakePlatformStoreTag(platform));
         }
     }
 }

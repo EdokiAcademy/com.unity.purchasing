@@ -50,7 +50,7 @@ namespace UnityEngine.Purchasing
         /// <param name="billingResult"></param>
         /// <param name="javaPurchasesList"></param>
         [Preserve]
-        public void onPurchasesUpdated(AndroidJavaObject billingResult, AndroidJavaObject javaPurchasesList)
+        void onPurchasesUpdated(AndroidJavaObject billingResult, AndroidJavaObject javaPurchasesList)
         {
             IGoogleBillingResult result = new GoogleBillingResult(billingResult);
             var purchases = m_PurchaseBuilder.BuildPurchases(javaPurchasesList.EnumerateAndWrap()).ToList();

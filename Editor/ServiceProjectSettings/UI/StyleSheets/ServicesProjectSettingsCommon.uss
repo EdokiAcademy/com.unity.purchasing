@@ -187,7 +187,6 @@
 }
 
 .note-tag{
-    white-space:normal;
     flex-direction:row;
     align-items:flex-start;
     align-self:flex-start;
@@ -221,7 +220,6 @@
 }
 
 .numbered-item {
-    white-space:normal;
     padding-top:5px;
     padding-bottom:5px;
 }
@@ -279,7 +277,6 @@
     -unity-font-style:bold;
 }
 
-.invisible-separator,
 .separator {
     margin-top:5px;
     margin-bottom:5px;
@@ -499,6 +496,7 @@
 
 .warning-label-container {
     flex-direction:row;
+    flex-wrap:nowrap;
 }
 
 .warning-message {

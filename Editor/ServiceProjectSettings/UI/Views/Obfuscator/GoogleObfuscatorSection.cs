@@ -6,20 +6,10 @@ namespace UnityEditor.Purchasing
     {
         readonly GoogleConfigurationData m_GoogleConfigDataRef;
 
-        const string k_GooglePlayKeyEntry = "GooglePlayKeyEntry";
-
         internal GoogleObfuscatorSection(GoogleConfigurationData googleData)
             : base()
         {
             m_GoogleConfigDataRef = googleData;
-        }
-
-        internal void RegisterGooglePlayKeyChangedCallback()
-        {
-            RegisterGooglePlayKeyChangedCallback(evt =>
-            {
-                m_GoogleConfigDataRef.googlePlayKey = evt.newValue;
-            });
         }
 
         protected override void ObfuscateKeys()
@@ -35,16 +25,6 @@ namespace UnityEditor.Purchasing
         protected override bool DoesTangleFileExist()
         {
             return ObfuscationGenerator.DoesGooglePlayTangleClassExist();
-        }
-
-        internal void SetGooglePlayKeyText(string key)
-        {
-            m_ObfuscatorBlock.Q<TextField>(k_GooglePlayKeyEntry).SetValueWithoutNotify(key);
-        }
-
-        internal void RegisterGooglePlayKeyChangedCallback(EventCallback<ChangeEvent<string>> changeEvent)
-        {
-            m_ObfuscatorBlock.Q<TextField>(k_GooglePlayKeyEntry).RegisterValueChangedCallback(changeEvent);
         }
     }
 }

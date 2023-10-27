@@ -32,7 +32,7 @@ namespace UnityEngine.Purchasing
         }
 
         [Preserve]
-        public void onSkuDetailsResponse(AndroidJavaObject billingResult, AndroidJavaObject? skuDetails)
+        internal void onSkuDetailsResponse(AndroidJavaObject billingResult, AndroidJavaObject? skuDetails)
         {
             if (skuDetails == null)
             {

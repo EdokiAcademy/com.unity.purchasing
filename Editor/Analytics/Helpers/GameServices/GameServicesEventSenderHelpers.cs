@@ -37,9 +37,9 @@ namespace UnityEditor.Purchasing
             BuildAndSendEvent(GameServicesEventComponents.k_ComponentTopMenu, GameServicesEventActions.k_ActionSwitchStore);
         }
 
-        internal static void SendProjectSettingsOpenDashboardForPublicKey()
+        internal static void SendProjectSettingsValidatePublicKey()
         {
-            BuildAndSendEvent(GameServicesEventComponents.k_ComponentProjectSettings, GameServicesEventActions.k_ActionOpenDashboardForPublicKey);
+            BuildAndSendEvent(GameServicesEventComponents.k_ComponentProjectSettings, GameServicesEventActions.k_ActionValidatePublicKey);
         }
 
         static void BuildAndSendEvent(string component, string action)

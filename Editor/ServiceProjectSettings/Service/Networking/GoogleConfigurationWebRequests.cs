@@ -1,76 +1,195 @@
 using System;
-using System.Threading.Tasks;
+using System.Text;
 using UnityEngine;
-using Unity.Services.Core.Editor;
+using UnityEngine.Networking;
 
 namespace UnityEditor.Purchasing
 {
     class GoogleConfigurationWebRequests
     {
-        readonly Action<string, GooglePlayRevenueTrackingKeyState> m_GetGooglePlayKeyCallback;
-        IAccessTokens m_CoreAccessTokens;
+        const string k_GoogleKeySubPath = "/api/v2/projects/";
+        const string k_GoogleKeyGetSuffix = "/get_google_pub_key";
+        const string k_GoogleKeyPostSuffix = "/set_google_pub_key";
+        const string k_GoogleKeyJsonLabel = "google_pub_key";
 
-        internal GoogleConfigurationWebRequests(Action<string, GooglePlayRevenueTrackingKeyState> onGetGooglePlayKey)
+        const string k_AuthHeaderName = "Authorization";
+        const string k_AuthHeaderValueFormat = "Basic {0}";
+        const string k_ContentHeaderName = "Content-Type";
+        const string k_ContentHeaderValue = "application/json;charset=UTF-8";
+        readonly IWebRequestInternal m_WebRequest = new CloudProjectWebRequest();
+
+        UnityWebRequest m_GetGoogleKeyRequest;
+        readonly GoogleConfigurationData m_PurchasingRemoteDataRef;
+        readonly Action<string> m_GetGooglePlayKeyCallback;
+        readonly Action<GooglePlayRevenueTrackingKeyState> m_SetGooglePlayKeyCallback;
+
+        internal GoogleConfigurationWebRequests(GoogleConfigurationData remoteData, Action<string> onGetGooglePlayKey, Action<GooglePlayRevenueTrackingKeyState> onSetGooglePlayKey)
         {
+            m_PurchasingRemoteDataRef = remoteData;
+
             m_GetGooglePlayKeyCallback = onGetGooglePlayKey;
-            m_CoreAccessTokens = new AccessTokens();
+            m_SetGooglePlayKeyCallback = onSetGooglePlayKey;
+        }
+
+        ~GoogleConfigurationWebRequests()
+        {
+            CancelGetGoogleKeyRequest();
+        }
+
+        void CancelGetGoogleKeyRequest()
+        {
+            m_GetGoogleKeyRequest?.Abort();
+            m_GetGoogleKeyRequest?.Dispose();
+            m_GetGoogleKeyRequest = null;
         }
 
         internal void RequestRetrieveKeyOperation()
         {
-            GetGatewayTokenAndThenRetrieveGooglePlayKey();
+            AuthSignatureWebRequests.RequestAuthSignature(m_WebRequest, GetGooglePlayKey);
         }
 
-        async void GetGatewayTokenAndThenRetrieveGooglePlayKey()
+        void GetGooglePlayKey(string projectAuthSignature)
         {
-            var gatewayToken = await m_CoreAccessTokens.GetServicesGatewayTokenAsync();
-            if (!string.IsNullOrEmpty(gatewayToken))
+            if (m_GetGoogleKeyRequest == null)
             {
-                GetGooglePlayKey(gatewayToken);
+                BuildGetGooglePlayKeyWebRequest(projectAuthSignature);
+
+                var operation = m_GetGoogleKeyRequest.SendWebRequest();
+                operation.completed += OnGetGooglePlayKey;
+            }
+        }
+
+        void BuildGetGooglePlayKeyWebRequest(string projectAuthSignature)
+        {
+            m_GetGoogleKeyRequest = UnityWebRequest.Get(GetGoogleKeyResource() + k_GoogleKeyGetSuffix);
+            m_GetGoogleKeyRequest.suppressErrorsToConsole = true;
+
+            AddAuthTokenToRequestHeader(m_GetGoogleKeyRequest, projectAuthSignature);
+        }
+
+        static void AddAuthTokenToRequestHeader(UnityWebRequest request, string projectAuthSignature)
+        {
+            var encodedAuthToken = NetworkingUtils.Base64Encode(NetworkingUtils.GetProjectGuid() + ":" + projectAuthSignature);
+            request.SetRequestHeader(k_AuthHeaderName, string.Format(k_AuthHeaderValueFormat, encodedAuthToken));
+        }
+
+        void OnGetGooglePlayKey(AsyncOperation getKeyOperation)
+        {
+            var webOp = (UnityWebRequestAsyncOperation)getKeyOperation;
+
+            if (webOp?.isDone == true && m_GetGoogleKeyRequest != null)
+            {
+                FetchGooglePlayKeyFromRequest();
+
+                m_GetGoogleKeyRequest.Dispose();
+                m_GetGoogleKeyRequest = null;
+            }
+        }
+
+        void FetchGooglePlayKeyFromRequest()
+        {
+            var googlePlayKey = "";
+            if (IsGoogleKeyRequestResultSuccess())
+            {
+                try
+                {
+                    googlePlayKey = NetworkingUtils.GetValueFromJsonDictionary(m_GetGoogleKeyRequest.downloadHandler.text, k_GoogleKeyJsonLabel);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogException(ex);
+
+                    m_PurchasingRemoteDataRef.googlePlayKey = "";
+                }
             }
             else
             {
-                m_GetGooglePlayKeyCallback(null, GooglePlayRevenueTrackingKeyState.ServerError);
+                m_PurchasingRemoteDataRef.googlePlayKey = "";
             }
+
+            m_PurchasingRemoteDataRef.googlePlayKey = googlePlayKey;
+
+            m_GetGooglePlayKeyCallback(m_PurchasingRemoteDataRef.googlePlayKey);
+
         }
 
-        async void GetGooglePlayKey(string gatewayToken)
+        bool IsGoogleKeyRequestResultSuccess()
         {
-            var googlePlayKeyResult = await GetGoogleKeyWebRequest.RequestGooglePlayKeyAsync(gatewayToken);
-            ReportGooglePlayKeyAndTrackingState(googlePlayKeyResult.GooglePlayKey, googlePlayKeyResult.ResponseCode);
+            return m_GetGoogleKeyRequest.IsResultTransferSuccess();
         }
 
-        void ReportGooglePlayKeyAndTrackingState(string googlePlayKey, long responseCode)
+        internal void RequestUpdateOperation()
         {
-            var trackingState = InterpretKeyStateFromProtocolError(responseCode);
+            AuthSignatureWebRequests.RequestAuthSignature(m_WebRequest, PushGooglePlayKey);
+        }
 
-            if (trackingState == GooglePlayRevenueTrackingKeyState.Verified && string.IsNullOrEmpty(googlePlayKey))
+        void PushGooglePlayKey(string projectAuthSignature)
+        {
+            var request = BuildPushGooglePlayKeyRequest(projectAuthSignature);
+
+            var operation = request.SendWebRequest();
+            operation.completed += OnSubmitGooglePlayKey;
+        }
+
+        UnityWebRequest BuildPushGooglePlayKeyRequest(string projectAuthSignature)
+        {
+            var payload = "{\"" + k_GoogleKeyJsonLabel + "\": \"" + m_PurchasingRemoteDataRef.googlePlayKey + "\"}";
+            var jsonUploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(payload));
+            var request = new UnityWebRequest(GetGoogleKeyResource() + k_GoogleKeyPostSuffix,
+                    UnityWebRequest.kHttpVerbPOST)
             {
-                trackingState = GooglePlayRevenueTrackingKeyState.InvalidFormat;
+                uploadHandler = jsonUploadHandler,
+                suppressErrorsToConsole = true
+            };
+
+            AddAuthTokenToRequestHeader(request, projectAuthSignature);
+            request.SetRequestHeader(k_ContentHeaderName, k_ContentHeaderValue);
+
+            return request;
+        }
+
+        void OnSubmitGooglePlayKey(AsyncOperation pushKeyOperation)
+        {
+            var pushKeyWebOperation = (UnityWebRequestAsyncOperation)pushKeyOperation;
+
+            if (pushKeyWebOperation?.isDone == true)
+            {
+                var completedRequest = pushKeyWebOperation.webRequest;
+                if (completedRequest != null)
+                {
+                    HandleCompletedSubmitResponse(completedRequest);
+                }
             }
+        }
 
-            m_GetGooglePlayKeyCallback(googlePlayKey, trackingState);
-
+        void HandleCompletedSubmitResponse(UnityWebRequest completedRequest)
+        {
+            var keyState = completedRequest.IsResultTransferSuccess()
+                ? GooglePlayRevenueTrackingKeyState.Verified
+                : completedRequest.IsResultProtocolError()
+                    ? InterpretKeyStateFromProtocolError(completedRequest.responseCode)
+                    : GooglePlayRevenueTrackingKeyState.InvalidFormat;
+            m_SetGooglePlayKeyCallback(keyState);
         }
 
         static GooglePlayRevenueTrackingKeyState InterpretKeyStateFromProtocolError(long responseCode)
         {
             switch (responseCode)
             {
-                case 200:
-                    return GooglePlayRevenueTrackingKeyState.Verified;
                 case 401:
                 case 403:
                     return GooglePlayRevenueTrackingKeyState.UnauthorizedUser;
-                case 400:
-                case 404:
-                    return GooglePlayRevenueTrackingKeyState.CantFetch;
                 case 405:
                 case 500:
                     return GooglePlayRevenueTrackingKeyState.ServerError;
                 default:
-                    return GooglePlayRevenueTrackingKeyState.CantFetch; //Could instead use a generic unknown message, but this is good enough.
+                    return GooglePlayRevenueTrackingKeyState.InvalidFormat;
             }
+        }
+
+        static string GetGoogleKeyResource()
+        {
+            return PurchasingUrls.analyticsApiUrl + k_GoogleKeySubPath + NetworkingUtils.GetProjectGuid();
         }
     }
 }

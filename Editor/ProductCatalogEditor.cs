@@ -5,7 +5,6 @@ using System.Linq;
 using System.Reflection;
 using UnityEditor.Connect;
 using UnityEngine;
-using UnityEngine.Networking;
 using UnityEngine.Purchasing;
 
 namespace UnityEditor.Purchasing
@@ -56,38 +55,18 @@ namespace UnityEditor.Purchasing
 
         #region UDP Related Fields
 
-        [Obsolete("Internal API to be removed with UDP deprecation.")]
         private static bool kValidLogin = true; // User needs to login to Unity first.
-
-        [Obsolete("Internal API to be removed with UDP deprecation.")]
         private static bool kValidConfig = true; // User needs to have clientID for the game.
 
-        [Obsolete("Internal API to be removed with UDP deprecation.")]
         private static readonly Queue<ReqStruct> requestQueue = new Queue<ReqStruct>();
 
-        [Obsolete("Internal API to be removed with UDP deprecation.")]
         private static bool kIsPreparing = true;
-
-        [Obsolete("Internal API to be removed with UDP deprecation.")]
         private static TokenInfo kTokenInfo = new TokenInfo();
-
-        [Obsolete("Internal API to be removed with UDP deprecation.")]
         private static string kOrgId;
-
-        [Obsolete("Internal API to be removed with UDP deprecation.")]
         private static object kAppStoreSettings; //UDP AppStoreSettings via Reflection
-
-        [Obsolete("Internal API to be removed with UDP deprecation.")]
         private static readonly IDictionary<string, IapItem> kIapItems = new Dictionary<string, IapItem>();
-
-        [Obsolete("Internal API to be removed with UDP deprecation.")]
         private static readonly bool s_udpAvailable = UdpSynchronizationApi.CheckUdpAvailability();
-
-        [Obsolete("Internal API to be removed with UDP deprecation.")]
         private static string kUdpErrorMsg = "";
-
-        [Obsolete("Internal API to be removed with UDP deprecation.")]
-        private static bool udpOfflineMode;
 
         #endregion
 
@@ -172,12 +151,6 @@ namespace UnityEditor.Purchasing
                 productEditors.Add(new ProductCatalogItemEditor(product));
             }
 
-            SetupUdpOnEnable();
-        }
-
-        [Obsolete("Internal API to be removed with UDP deprecation.")]
-        void SetupUdpOnEnable()
-        {
             if (s_udpAvailable && IsUdpInstalled())
             {
                 kUdpErrorMsg = "";
@@ -190,10 +163,9 @@ namespace UnityEditor.Purchasing
             }
         }
 
-        [Obsolete("Internal API to be removed with UDP deprecation.")]
         private static bool IsUdpInstalled()
         {
-            return UnityPurchasingEditor.IsUdpUpmPackageInstalled() || UnityPurchasingEditor.IsUdpAssetStorePackageInstalled();
+            return UnityPurchasingEditor.IsUdpUmpPackageInstalled() || UnityPurchasingEditor.IsUdpAssetStorePackageInstalled();
         }
 
         private void OnDisable()
@@ -500,7 +472,6 @@ namespace UnityEditor.Purchasing
 
         #region UDP Related Functions
 
-        [Obsolete("Internal API to be removed with UDP deprecation.")]
         // This method is used in Update() to check the UnityWebRequest each frame
         private void CheckApiUpdate()
         {
@@ -511,14 +482,29 @@ namespace UnityEditor.Purchasing
 
             var reqStruct = requestQueue.Dequeue();
             var request = reqStruct.request;
+            var resp = reqStruct.resp;
 
             if (request != null && request.isDone) // Check what the request is and parse the response
             {
                 var downloadedRawJson = request.downloadHandler.text;
 
-                if (!CheckAndHandleNetworkErrors(reqStruct, downloadedRawJson))
+                // Deal with errors
+                if (request.error != null || (request.responseCode / 100) != 2)
                 {
-                    var resp = reqStruct.resp;
+                    TryParseErrorAsJson(downloadedRawJson, request.responseCode);
+
+                    if (reqStruct.itemEditor != null)
+                    {
+                        kIsPreparing = false;
+                        reqStruct.itemEditor.udpItemSyncing = false;
+                        reqStruct.itemEditor.udpSyncErrorMsg = kUdpErrorMsg;
+                        kUdpErrorMsg = "";
+                    }
+                }
+
+                // No error.
+                else
+                {
                     if (resp.GetType() == typeof(TokenInfo))
                     {
                         resp = JsonUtility.FromJson<TokenInfo>(downloadedRawJson);
@@ -531,6 +517,7 @@ namespace UnityEditor.Purchasing
 
                         requestQueue.Enqueue(newReqStruct);
                     }
+
                     // Get orgId request
                     else if (resp.GetType() == typeof(OrgIdResponse))
                     {
@@ -558,12 +545,11 @@ namespace UnityEditor.Purchasing
                             {
                                 kIapItems[item.slug] = item;
                             }
-
-                            udpOfflineMode = false;
                         }
 
                         kIsPreparing = false;
                     }
+
                     // Creating/Updating IAP item succeeds
                     else if (resp.GetType() == typeof(IapItemResponse))
                     {
@@ -586,55 +572,6 @@ namespace UnityEditor.Purchasing
             }
         }
 
-        [Obsolete("Internal API to be removed with UDP deprecation.")]
-        bool CheckAndHandleNetworkErrors(ReqStruct reqStruct, string downloadedRawJson)
-        {
-            var request = reqStruct.request;
-
-            // Deal with errors
-            if (DidUdpRequestHaveErrors(request))
-            {
-                TryParseErrorAsJson(downloadedRawJson, request.responseCode);
-
-                if (reqStruct.resp.GetType() == typeof(IapItemSearchResponse))
-                {
-                    if (IsUdpBackendDeprecated(request))
-                    {
-                        kUdpErrorMsg += "\nThe UDP service endpoint is now deprecated. You may continue to use this functionality, but it can't be synchronized online. Make sure to synchronize your product prices with the UDP module manually.";
-                    }
-                    else
-                    {
-                        kUdpErrorMsg += "\nThe UDP service endpoint is currently unavailable. You may continue to use this functionality, but it can't be synchronized online. Make sure to synchronize your product prices with the UDP module manually.";
-                    }
-                    udpOfflineMode = true;
-                }
-
-                if (reqStruct.itemEditor != null)
-                {
-                    kIsPreparing = false;
-                    reqStruct.itemEditor.udpItemSyncing = false;
-
-                    reqStruct.itemEditor.udpSyncErrorMsg = kUdpErrorMsg;
-                    kUdpErrorMsg = "";
-                }
-
-                return true;
-            }
-
-            return false;
-        }
-
-        static bool DidUdpRequestHaveErrors(UnityWebRequest request)
-        {
-            return request.error != null || !request.IsResponseCodeOk() || request.result == UnityWebRequest.Result.ConnectionError;
-        }
-
-        static bool IsUdpBackendDeprecated(UnityWebRequest request)
-        {
-            return request.responseCode == 410 || request.result == UnityWebRequest.Result.ConnectionError;
-        }
-
-        [Obsolete("Internal API to be removed with UDP deprecation.")]
         void TryParseErrorAsJson(string downloadedRawJson, long responseCode)
         {
             try
@@ -650,7 +587,6 @@ namespace UnityEditor.Purchasing
             }
         }
 
-        [Obsolete("Internal API to be removed with UDP deprecation.")]
         /// <summary>
         /// Get userId, orgId of the developer. Make prepare for syncing
         /// </summary>
@@ -688,7 +624,6 @@ namespace UnityEditor.Purchasing
             }
         }
 
-        [Obsolete("API to be removed with UDP deprecation.")]
         /// <summary>
         /// Gets the authenticate code of a web response.
         /// </summary>
@@ -739,21 +674,17 @@ namespace UnityEditor.Purchasing
             private bool payoutsVisible = false;
             private bool googleVisible = false;
             private bool appleVisible = false;
-
-            [Obsolete("Internal API to be removed with UDP deprecation.")]
             private bool udpVisible = false;
 
             private bool idDuplicate = false;
             private bool idInvalid = false;
             private bool shouldBeMarked = true;
 
-            [Obsolete("API to be removed with UDP deprecation.")]
             /// <summary>
             /// Whether or not this item is syncing a UDP item.
             /// </summary>
             public Boolean udpItemSyncing = false;
 
-            [Obsolete("API to be removed with UDP deprecation.")]
             /// <summary>
             /// The Error message of the UDP sync, if applicable.
             /// </summary>
@@ -787,7 +718,7 @@ namespace UnityEditor.Purchasing
             /// </summary>
             public void OnGUI()
             {
-                var style = new GUIStyle(EditorStyles.foldout);
+                var s = new GUIStyle(EditorStyles.foldout);
                 var box = EditorGUILayout.BeginVertical();
 
                 var rect = new Rect(box.xMax - EditorGUIUtility.singleLineHeight - 2, box.yMin, EditorGUIUtility.singleLineHeight + 2, EditorGUIUtility.singleLineHeight);
@@ -822,12 +753,12 @@ namespace UnityEditor.Purchasing
 
                 ShowAndProcessProductTypeBlockGui(idRect.width);
 
-                advancedVisible = CompatibleGUI.Foldout(advancedVisible, "Advanced", true, style);
+                advancedVisible = CompatibleGUI.Foldout(advancedVisible, "Advanced", true, s);
                 if (advancedVisible)
                 {
                     EditorGUI.indentLevel++;
 
-                    descriptionVisible = CompatibleGUI.Foldout(descriptionVisible, "Descriptions", true, style);
+                    descriptionVisible = CompatibleGUI.Foldout(descriptionVisible, "Descriptions", true, s);
                     if (descriptionVisible)
                     {
                         EditorGUI.indentLevel++;
@@ -880,7 +811,7 @@ namespace UnityEditor.Purchasing
 
                     if (editorSupportsPayouts)
                     {
-                        payoutsVisible = EditorGUILayout.Foldout(payoutsVisible, "Payouts", style);
+                        payoutsVisible = EditorGUILayout.Foldout(payoutsVisible, "Payouts", s);
                         if (payoutsVisible)
                         {
                             EditorGUI.indentLevel++;
@@ -928,7 +859,7 @@ namespace UnityEditor.Purchasing
 
                     EditorGUILayout.Separator();
 
-                    storeIDsVisible = CompatibleGUI.Foldout(storeIDsVisible, "Store ID Overrides", true, style);
+                    storeIDsVisible = CompatibleGUI.Foldout(storeIDsVisible, "Store ID Overrides", true, s);
 
                     if (storeIDsVisible)
                     {
@@ -944,7 +875,7 @@ namespace UnityEditor.Purchasing
 
                     EditorGUILayout.Separator();
 
-                    googleVisible = CompatibleGUI.Foldout(googleVisible, "Google Configuration", true, style);
+                    googleVisible = CompatibleGUI.Foldout(googleVisible, "Google Configuration", true, s);
                     if (googleVisible)
                     {
                         EditorGUI.indentLevel++;
@@ -956,7 +887,7 @@ namespace UnityEditor.Purchasing
 
                     EditorGUILayout.Separator();
 
-                    appleVisible = CompatibleGUI.Foldout(appleVisible, "Apple Configuration", true, style);
+                    appleVisible = CompatibleGUI.Foldout(appleVisible, "Apple Configuration", true, s);
                     if (appleVisible)
                     {
                         EditorGUI.indentLevel++;
@@ -968,142 +899,127 @@ namespace UnityEditor.Purchasing
 
                     EditorGUILayout.Separator();
 
-                    OnUdpGui(style);
+                    #region UDP Catalog
+
+                    if (s_udpAvailable && IsUdpInstalled())
+                    {
+                        EditorGUILayout.Separator();
+                        udpVisible = CompatibleGUI.Foldout(udpVisible, "Unity Distribution Portal Configuration",
+                            true, s);
+
+                        if (udpVisible)
+                        {
+                            EditorGUI.indentLevel++;
+
+                            if (!string.IsNullOrEmpty(udpSyncErrorMsg))
+                            {
+                                var errStyle = new GUIStyle();
+                                errStyle.normal.textColor = Color.red;
+                                EditorGUILayout.LabelField(udpSyncErrorMsg, errStyle);
+                            }
+
+                            var udpFieldsDisabled = kIsPreparing || udpItemSyncing || !kValidLogin || !kValidConfig;
+
+                            //If everything appears ok, check UDP compatibility and warn user if there's a problem
+                            //This should not stop the user from doing some UDP sync work, as there is no current blocker for those features.
+                            if (!udpFieldsDisabled && string.IsNullOrEmpty(kUdpErrorMsg) && !UdpSynchronizationApi.CheckUdpCompatibility())
+                            {
+                                kUdpErrorMsg = "Please update your UDP package. Transaction features will no longer work at runtime with your current UDP version";
+                            }
+
+                            if (!string.IsNullOrEmpty(kUdpErrorMsg))
+                            {
+                                var errStyle = new GUIStyle();
+                                errStyle.normal.textColor = Color.red;
+                                EditorGUILayout.LabelField(kUdpErrorMsg, errStyle);
+                            }
+
+                            EditorGUI.BeginDisabledGroup(udpFieldsDisabled);
+
+                            BeginErrorBlock(validation, "udpPrice");
+                            EditorGUILayout.LabelField(
+                                "Please provide a price in USD, other currencies can be edited on UDP console.");
+
+                            var priceStr = EditorGUILayout.TextField("Price:",
+                                Item.udpPrice == null || Item.udpPrice.value == 0
+                                    ? string.Empty
+                                    : Item.udpPrice.value.ToString());
+
+                            Item.udpPrice.value = decimal.TryParse(priceStr, out var priceDecimal) ? priceDecimal : 0;
+
+                            EndErrorBlock(validation, "udpPrice");
+
+                            if (GUILayout.Button("Sync to UDP"))
+                            {
+                                udpSyncErrorMsg = "";
+                                var iapItem = new IapItem
+                                {
+                                    consumable = Item.type == ProductType.Consumable,
+                                    slug = Item.GetStoreID(UDP.Name) ?? Item.id,
+                                    name = Item.defaultDescription.Title
+                                };
+                                iapItem.properties.description = Item.defaultDescription.Description;
+                                iapItem.priceSets.PurchaseFee.priceMap.DEFAULT.Add(new PriceDetail
+                                {
+                                    price = Item.udpPrice.value.ToString()
+                                });
+
+                                if (kAppStoreSettings != null)
+                                {
+                                    var appSlug = AppStoreSettingsInterface.GetAppSlugField();
+                                    iapItem.masterItemSlug = (string)appSlug.GetValue(kAppStoreSettings);
+                                }
+
+                                iapItem.ownerId = kOrgId;
+
+                                if (iapItem.ValidationCheck() == "")
+                                {
+                                    if (kIapItems.ContainsKey(iapItem.slug)) // Update
+                                    {
+                                        iapItem.id = kIapItems[iapItem.slug].id;
+                                        requestQueue.Enqueue(new ReqStruct
+                                        {
+                                            resp = new IapItemResponse(),
+                                            itemEditor = this,
+                                            request = UdpSynchronizationApi.CreateUpdateStoreItemRequest(kTokenInfo.access_token,
+                                                iapItem),
+                                            iapItem = iapItem,
+                                        });
+                                    }
+                                    else // Create
+                                    {
+                                        requestQueue.Enqueue(new ReqStruct
+                                        {
+                                            request = UdpSynchronizationApi.CreateAddStoreItemRequest(kTokenInfo.access_token,
+                                                kOrgId, iapItem),
+                                            resp = new IapItemResponse(),
+                                            itemEditor = this,
+                                            iapItem = iapItem,
+                                        });
+                                    }
+
+                                    udpItemSyncing = true;
+
+                                    GenericEditorButtonClickEventSenderHelpers.SendCatalogSyncToUdpEvent();
+                                }
+                                else
+                                {
+                                    EditorUtility.DisplayDialog("Sync Error", iapItem.ValidationCheck(), "OK");
+                                }
+                            }
+
+                            EditorGUI.EndDisabledGroup();
+
+                            EditorGUI.indentLevel--;
+                        }
+                    }
+
+                    #endregion
 
                     EditorGUI.indentLevel--;
                 }
 
                 EditorGUILayout.EndVertical();
-            }
-
-            [Obsolete("Internal API to be removed with UDP deprecation.")]
-            void OnUdpGui(GUIStyle style)
-            {
-                if (s_udpAvailable && IsUdpInstalled())
-                {
-                    EditorGUILayout.Separator();
-                    udpVisible = CompatibleGUI.Foldout(udpVisible, "Unity Distribution Portal Configuration",
-                        true, style);
-
-                    if (udpVisible)
-                    {
-                        EditorGUI.indentLevel++;
-
-                        if (!string.IsNullOrEmpty(udpSyncErrorMsg))
-                        {
-                            var errStyle = new GUIStyle();
-                            errStyle.normal.textColor = Color.red;
-                            EditorGUILayout.LabelField(udpSyncErrorMsg, errStyle);
-                        }
-
-                        var udpFieldsDisabled = (kIsPreparing || udpItemSyncing || !kValidLogin || !kValidConfig) && !udpOfflineMode;
-
-                        //If everything appears ok, check UDP compatibility and warn user if there's a problem
-                        //This should not stop the user from doing some UDP sync work, as there is no current blocker for those features.
-                        if (!udpFieldsDisabled && string.IsNullOrEmpty(kUdpErrorMsg) && !UdpSynchronizationApi.CheckUdpCompatibility())
-                        {
-                            kUdpErrorMsg = "Please update your UDP package. Transaction features will no longer work at runtime with your current UDP version";
-                        }
-
-                        if (!string.IsNullOrEmpty(kUdpErrorMsg))
-                        {
-                            var errStyle = new GUIStyle();
-                            errStyle.normal.textColor = Color.red;
-                            errStyle.wordWrap = true;
-
-                            EditorGUILayout.BeginVertical();
-                            EditorGUILayout.LabelField(kUdpErrorMsg, errStyle);
-                            EditorGUILayout.EndVertical();
-                        }
-
-                        EditorGUI.BeginDisabledGroup(udpFieldsDisabled);
-
-                        BeginErrorBlock(validation, "udpPrice");
-                        EditorGUILayout.LabelField(
-                            "Please provide a price in USD, other currencies can be edited on UDP console.");
-
-                        var priceStr = EditorGUILayout.TextField("Price:",
-                            Item.udpPrice == null || Item.udpPrice.value == 0
-                                ? string.Empty
-                                : Item.udpPrice.value.ToString());
-
-                        Item.udpPrice.value = decimal.TryParse(priceStr, out var priceDecimal) ? priceDecimal : 0;
-
-                        EndErrorBlock(validation, "udpPrice");
-
-                        OnSyncToUdpGui();
-
-                        EditorGUI.EndDisabledGroup();
-
-                        EditorGUI.indentLevel--;
-                    }
-                }
-            }
-
-            [Obsolete("Internal API to be removed with UDP deprecation.")]
-            void OnSyncToUdpGui()
-            {
-                if (!udpOfflineMode)
-                {
-                    if (GUILayout.Button("Sync to UDP"))
-                    {
-                        udpSyncErrorMsg = "";
-                        var iapItem = new IapItem
-                        {
-                            consumable = Item.type == ProductType.Consumable,
-                            slug = Item.GetStoreID(UDP.Name) ?? Item.id,
-                            name = Item.defaultDescription.Title
-                        };
-                        iapItem.properties.description = Item.defaultDescription.Description;
-                        iapItem.priceSets.PurchaseFee.priceMap.DEFAULT.Add(new PriceDetail
-                        {
-                            price = Item.udpPrice.value.ToString()
-                        });
-
-                        if (kAppStoreSettings != null)
-                        {
-                            var appSlug = AppStoreSettingsInterface.GetAppSlugField();
-                            iapItem.masterItemSlug = (string)appSlug.GetValue(kAppStoreSettings);
-                        }
-
-                        iapItem.ownerId = kOrgId;
-
-                        if (iapItem.ValidationCheck() == "")
-                        {
-                            if (kIapItems.ContainsKey(iapItem.slug)) // Update
-                            {
-                                iapItem.id = kIapItems[iapItem.slug].id;
-                                requestQueue.Enqueue(new ReqStruct
-                                {
-                                    resp = new IapItemResponse(),
-                                    itemEditor = this,
-                                    request = UdpSynchronizationApi.CreateUpdateStoreItemRequest(kTokenInfo.access_token,
-                                        iapItem),
-                                    iapItem = iapItem,
-                                });
-                            }
-                            else // Create
-                            {
-                                requestQueue.Enqueue(new ReqStruct
-                                {
-                                    request = UdpSynchronizationApi.CreateAddStoreItemRequest(kTokenInfo.access_token,
-                                        kOrgId, iapItem),
-                                    resp = new IapItemResponse(),
-                                    itemEditor = this,
-                                    iapItem = iapItem,
-                                });
-                            }
-
-                            udpItemSyncing = true;
-
-                            GenericEditorButtonClickEventSenderHelpers.SendCatalogSyncToUdpEvent();
-                        }
-                        else
-                        {
-                            EditorUtility.DisplayDialog("Sync Error", iapItem.ValidationCheck(), "OK");
-                        }
-                    }
-                }
             }
 
             void ShowAndProcessProductIDBlockGui(Rect idRect)

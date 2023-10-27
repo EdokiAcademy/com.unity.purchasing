@@ -1,5 +1,3 @@
-#if IAP_LEGACY_ANALYTICS_SERVICE_ENABLED
-
 using System;
 using System.Collections.Generic;
 
@@ -23,5 +21,3 @@ namespace UnityEngine.Purchasing
         }
     }
 }
-
-#endif

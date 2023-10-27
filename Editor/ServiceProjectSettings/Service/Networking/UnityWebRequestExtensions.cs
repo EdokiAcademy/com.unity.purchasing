@@ -6,17 +6,20 @@ namespace UnityEditor.Purchasing
     {
         public static bool IsResultTransferSuccess(this UnityWebRequest request)
         {
+#if UNITY_2020_1_OR_NEWER
             return request.isDone && request.result == UnityWebRequest.Result.Success;
+#else
+            return request.isDone && !request.isNetworkError && !request.isHttpError;
+#endif
         }
 
         public static bool IsResultProtocolError(this UnityWebRequest request)
         {
+#if UNITY_2020_1_OR_NEWER
             return request.isDone && request.result == UnityWebRequest.Result.ProtocolError;
-        }
-
-        public static bool IsResponseCodeOk(this UnityWebRequest request)
-        {
-            return (request.responseCode / 100) == 2;
+#else
+            return request.isDone && request.isHttpError;
+#endif
         }
     }
 }

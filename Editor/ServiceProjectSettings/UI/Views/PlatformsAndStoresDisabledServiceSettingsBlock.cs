@@ -17,10 +17,5 @@ namespace UnityEditor.Purchasing
         {
             return GetAllStores();
         }
-
-        protected override void FinalizeSetupPlatformAndStoresBlock()
-        {
-            //Nothing.
-        }
     }
 }

@@ -54,7 +54,6 @@ namespace UnityEditor.Purchasing
 
             SetupStyleSheets(rootElement);
             PopulateSections(rootElement);
-            FinalizeSetupPlatformAndStoresBlock();
 
             return rootElement;
         }
@@ -85,25 +84,22 @@ namespace UnityEditor.Purchasing
         {
             var tagContainer = GetClearedTagContainer(baseElement);
 
-            if (tagContainer != null)
+            foreach (var store in stores)
             {
-                foreach (var store in stores)
-                {
-                    tagContainer.Add(MakePlatformStoreTag(store));
-                }
+                tagContainer.Add(MakePlatformStoreTag(store));
             }
         }
 
         protected static VisualElement GetClearedTagContainer(VisualElement baseElement)
         {
             var tagContainer = GetTagContainer(baseElement);
-            tagContainer?.Clear();
+            tagContainer.Clear();
             return tagContainer;
         }
 
         protected static VisualElement GetTagContainer(VisualElement baseElement)
         {
-            return baseElement?.Q(className: k_TagContainerClass);
+            return baseElement.Q(className: k_TagContainerClass);
         }
 
         protected static VisualElement MakePlatformStoreTag(string assetDisplayName)
@@ -131,8 +127,6 @@ namespace UnityEditor.Purchasing
 
             label.text = assetDisplayName;
         }
-
-        protected abstract void FinalizeSetupPlatformAndStoresBlock();
 
         protected abstract IEnumerable<string> GetStoresForState();
 
