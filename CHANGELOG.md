@@ -1,5 +1,62 @@
 # Changelog
 
+## [4.12.1-pre.1] - 2024-06-06
+### Fixed
+- GooglePlay - Fixed errors related to `CloneReference` on Unity Engine 2021.1.
+
+### Removed
+- Removed unnecessary Android dependency, `androidx.activity:activity-compose:1.3.1`, which could cause conflicts with other plugins.
+
+## [4.12.0] - 2024-06-04
+### Added
+- GooglePlay - `IGooglePlayStoreExtensions.GetObfuscatedAccountId(Product product)` has been added to obtain the obfuscated account ID of the purchase set with `IGooglePlayConfiguration.SetObfuscatedAccountId`.
+- GooglePlay - `IGooglePlayStoreExtensions.GetObfuscatedProfileId(Product product)` has been added to obtain the obfuscated profile ID of the purchase set with `IGooglePlayConfiguration.SetObfuscatedProfileId`.
+- Apple - Added visionOS support
+
+### Changed
+- Upgraded `com.unity.services.core` from 1.8.2 to 1.12.5 to include their Apple privacy manifest.
+- GooglePlay - Dependencies are now injected in the gradle files. The Billing aar is no longer included.
+- GooglePlay - Billing Library updated to 6.2.1 (was previously 5.2.1). No new feature support was added. Subscriptions must still have only 1 base plan.
+- GooglePlay - Updated the internal implementation to use `productDetails` instead of `skuDetails` to solve the `setOfferToken` warning issued by Google.
+- GooglePlay - `IGooglePlayStoreExtensions.GetPurchaseState(Product product)` has been updated to use the [getPurchaseState() instead of getOriginalJson()](https://developer.android.com/google/play/billing/integrate#pending). This change will make the purchase state more reliable.
+- GooglePlay - `IGooglePlayStoreExtensions.ConfirmSubscriptionPriceChange` has been marked `[Obsolete]` as it is no longer supported since Google Play Billing Library 6.0.0. For alternatives, see the [price changes guide](https://developer.android.com/google/play/billing/price-changes).
+- GooglePlay - `IStoreListener.OnInitializeFailed` for `InitializationFailureReason.PurchasingUnavailable` will now return the BillingResponseCode when product retrieval is successful, but an error occured and no products were returned.
+
+### Fixed
+- Fixed `OnPurchaseFailed` - It now returns the `productId` (previously the `transactionId`) in the `PurchaseFailureDescription` when the product isn't available for purchase.
+- Fixed a NullReferenceException when retrieving products on Unity Engine 2020.
+
+### Removed
+- GooglePlay - The `iconUrl` and `skuDetailsToken` sub-entry to the `Product.receipt`'s `"Payload"`'s `"skuDetails"` will now return an empty string since they are no longer supported.
+
+## [4.11.0] - 2024-03-06
+### Added
+- GooglePlay - `IGooglePlayConfiguration.SetMaxConnectionAttempts(int maxConnectionAttempts)` has been added to specify the max connection attempts to the Google Play Store.
+- Apple - Added privacy manifest to comply with Apple's new privacy requirements. More details on how the Unity Engine supports this can be found [here](https://forum.unity.com/threads/apple-privacy-manifest-updates-for-unity-engine.1529026/).
+- Added `ConfigurationBuilder.logUnavailableProducts` to specify if unavailable products should be logged.
+
+### Changed
+- GooglePlay - The default max connection attempt to the Google Play Store has been increased from 1 to 3. See `IGooglePlayConfiguration.SetMaxConnectionAttempts` to configure this to a different value.
+- Apple - The log when retrieving products (SKProductsResponse) now also contains the invalid products count.
+- Improved `IStoreListener.OnInitializeFailed` for `InitializationFailureReason.NoProductsAvailable` by adding a message to clarify whether the store returned products or not.
+
+### Fixed
+- GooglePlay - Fixed AndroidJavaObject not being disposed causing a global reference table overflow in an edge case.
+- GooglePlay - Fixed bug causing BillingClient duplication resulting in ANR.
+- Apple - Fixed isFamilyShareable on tvOS to be only available on supported versions (14.0 and above).
+- Apple - Error codes when a purchase fails now always returns the code from Apple instead of defaulting to `SKErrorUnknown`.
+- Fixed Analytics' transactionServer being null.
+
+## [4.10.0] - 2023-09-07
+### Changed
+- Unity Distribution Portal - IAP will retract support for UDP at some point in the near future (Announcement TBD). Until then, all UDP features will continue to function, but the public interfaces, as well as some private functions are now marked `[Obsolete]`. In the next major update these will all be removed and UDP will cease to function with that version of In-App Purchasing and those that follow.
+- Unity Distribution Portal - If the editor is unable to connect to the UDP backend, the developer can now use some UDP catalog features in offline mode. This allows the developer to continue to enter prices, meaning that prices will need to be synced manually. In this case, we strongly suggest you sync your prices properly once connection is re-established. A warning message will display in the Catalog if the editor is unable to connect to the UDP backend.
+- Analytics - The Legacy Analytics built-in module, com.unity.modules.unityanalytics, is now no longer a dependency. You may now remove it from your project if you don't use it. Make sure it is in your project if you do use it.
+- Project Settings - In the Services Project Settings page of the Editor, we have changed the endpoint from which the Google Play Key is obtained. Also, instead of setting the key directly in the editor, there is now a dashboard link to set it directly on the backend to avoid future errors.
+
+### Fixed
+- Google Play - Some versions of the Unity Editor compiler were stripping `GooglePurchaseUpdatedListener.onPurchasesUpdated`, which was assigned as a callback to the Google Billing module, causing a lack of purchase failure callbacks, and logging `"No such proxy method:"`. Also fixed this for `BillingClientStateListener.onBillingServiceDisconnected`, `BillingClientStateListener.onBillingSetupFinished` and `SkuDetailsResponseListener.onSkuDetailsResponse`.
+
 ## [4.9.4] - 2023-08-01
 ### Changed
 - Google Play - Billing Library updated to 5.2.1 (was previously 5.1.0). No new feature support was added, this is simply to add compatibility with Android 14.

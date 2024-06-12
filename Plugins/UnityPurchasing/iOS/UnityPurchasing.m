@@ -147,7 +147,7 @@ int delayInSeconds = 2;
 // or the App Receipt in OSX and iOS 7+.
 - (NSString*)selectReceipt:(SKPaymentTransaction*)transaction
 {
-#if MAC_APPSTORE
+#if MAC_APPSTORE || __is_target_os(xros)
     return @"";
 #else
     if ([self isiOS6OrEarlier])
@@ -436,7 +436,7 @@ int delayInSeconds = 2;
 // Store Kit returns a response from an SKProductsRequest.
 - (void)productsRequest:(SKProductsRequest *)request didReceiveResponse:(SKProductsResponse *)response
 {
-    UnityPurchasingLog(@"Received %lu products", (unsigned long)[response.products count]);
+    UnityPurchasingLog(@"Received %lu products and %lu invalid products", (unsigned long)[response.products count], (unsigned long)[response.invalidProductIdentifiers count]);
     // Add the retrieved products to our set of valid products.
     NSDictionary* fetchedProducts = [NSDictionary dictionaryWithObjects: response.products forKeys: [response.products valueForKey: @"productIdentifier"]];
     [validProducts addEntriesFromDictionary: fetchedProducts];
@@ -565,7 +565,7 @@ int delayInSeconds = 2;
 
 - (void)handleTransactionPurchased:(SKPaymentTransaction*)transaction forProduct:(SKProduct*)product
 {
-#if MAC_APPSTORE
+#if MAC_APPSTORE || __is_target_os(xros)
     // There is no transactionReceipt on Mac
     NSString* receipt = @"";
 #else
@@ -608,7 +608,7 @@ int delayInSeconds = 2;
     NSString* errorCodeString = [UnityPurchasing storeKitErrorCodeNames][@(transaction.error.code)];
     if (errorCodeString == nil)
     {
-        errorCodeString = @"SKErrorUnknown";
+        errorCodeString = [NSString stringWithFormat: @"%ld", transaction.error.code];
     }
     NSString* errorDescription = [NSString stringWithFormat: @"APPLE_%@", transaction.error.localizedDescription];
     [self onPurchaseFailed: transaction.payment.productIdentifier reason: reason errorCode: errorCodeString errorDescription: errorDescription];
@@ -619,7 +619,7 @@ int delayInSeconds = 2;
 
 - (void)fetchStorePromotionOrder
 {
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000 && !__is_target_os(xros)
     if (@available(iOS 11.0, *))
     {
         [[SKProductStorePromotionController defaultController] fetchStorePromotionOrderWithCompletionHandler:^(NSArray<SKProduct *> * _Nonnull storePromotionOrder, NSError * _Nullable error) {
@@ -649,7 +649,7 @@ int delayInSeconds = 2;
 
 - (void)updateStorePromotionOrder:(NSArray*)productIds
 {
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000 && !__is_target_os(xros)
     if (@available(iOS 11_0, *))
     {
         NSMutableArray* products = [[NSMutableArray alloc] init];
@@ -676,7 +676,7 @@ int delayInSeconds = 2;
 
 - (void)fetchStorePromotionVisibilityForProduct:(NSString*)productId
 {
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000 && !__is_target_os(xros)
     if (@available(iOS 11.0, macOS 11.0, tvOS 11.0, *))
     {
         SKProduct *product = [validProducts objectForKey: productId];
@@ -713,7 +713,7 @@ int delayInSeconds = 2;
 // visibility should be one of "Default", "Hide", or "Show"
 - (void)updateStorePromotionVisibility:(NSString*)visibility forProduct:(NSString*)productId
 {
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000 && !__is_target_os(xros)
     if (@available(iOS 11_0, *))
     {
         SKProduct *product = [validProducts objectForKey: productId];
@@ -754,7 +754,7 @@ int delayInSeconds = 2;
     return YES;
 }
 
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000 && !__is_target_os(xros)
 + (NSString*)getStringForStorePromotionVisibility:(SKProductStorePromotionVisibility)storePromotionVisibility
     API_AVAILABLE(macos(11.0), ios(11.0), tvos(11.0))
 {
@@ -896,8 +896,9 @@ int delayInSeconds = 2;
         }
 ///////////////////////////////////// Edoki custom change end here /////////////////////////////////////
 
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 140000 || __MAC_OS_X_VERSION_MAX_ALLOWED >= 110000
-        if (@available(iOS 14, macOS 11.0,*))
+
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 140000 || __TV_OS_VERSION_MAX_ALLOWED >= 140000 || __MAC_OS_X_VERSION_MAX_ALLOWED >= 110000
+        if (@available(iOS 14, macOS 11.0, tvOS 14, *))
         {
             [product isFamilyShareable] ? [metadata setObject: @"true" forKey: @"isFamilyShareable"] : [metadata setObject: @"false" forKey: @"isFamilyShareable"];
         }
@@ -1075,19 +1076,27 @@ int delayInSeconds = 2;
 + (NSDictionary<NSNumber *, NSString *> *)storeKitErrorCodeNames
 {
     return @{
-            @(SKErrorUnknown): @"SKErrorUnknown",
-            @(SKErrorClientInvalid): @"SKErrorClientInvalid",
-            @(SKErrorPaymentCancelled): @"SKErrorPaymentCancelled",
-            @(SKErrorPaymentInvalid): @"SKErrorPaymentInvalid",
-            @(SKErrorPaymentNotAllowed): @"SKErrorPaymentNotAllowed",
-#if !MAC_APPSTORE
-            @(SKErrorStoreProductNotAvailable): @"SKErrorStoreProductNotAvailable",
-            @(SKErrorCloudServicePermissionDenied): @"SKErrorCloudServicePermissionDenied",
-            @(SKErrorCloudServiceNetworkConnectionFailed): @"SKErrorCloudServiceNetworkConnectionFailed",
-#endif
-#if !MAC_APPSTORE && (__IPHONE_OS_VERSION_MAX_ALLOWED >= 103000 || __TV_OS_VERSION_MAX_ALLOWED >= 103000)
-            @(SKErrorCloudServiceRevoked): @"SKErrorCloudServiceRevoked",
-#endif
+            @0: @"SKErrorUnknown",
+            @1: @"SKErrorClientInvalid",
+            @2: @"SKErrorPaymentCancelled",
+            @3: @"SKErrorPaymentInvalid",
+            @4: @"SKErrorPaymentNotAllowed",
+            @5: @"SKErrorStoreProductNotAvailable",
+            @6: @"SKErrorCloudServicePermissionDenied",
+            @7: @"SKErrorCloudServiceNetworkConnectionFailed",
+            @8: @"SKErrorCloudServiceRevoked",
+            @9: @"SKErrorPrivacyAcknowledgementRequired",
+            @10: @"SKErrorUnauthorizedRequestData",
+            @11: @"SKErrorInvalidOfferIdentifier",
+            @12: @"SKErrorInvalidSignature",
+            @13: @"SKErrorMissingOfferParams",
+            @14: @"SKErrorInvalidOfferPrice",
+            @15: @"SKErrorOverlayCancelled",
+            @16: @"SKErrorOverlayInvalidConfiguration",
+            @17: @"SKErrorOverlayTimeout",
+            @18: @"SKErrorIneligibleForOffer",
+            @19: @"SKErrorUnsupportedPlatform",
+            @20: @"SKErrorOverlayPresentedInBackgroundScene",
     };
 }
 

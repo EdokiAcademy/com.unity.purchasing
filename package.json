@@ -15,17 +15,16 @@
       "Android",
       "iOS"
     ],
-    "changelog": "### Changed\n- Google Play - Billing Library updated to 5.2.1 (was previously 5.1.0). No new feature support was added, this is simply to add compatibility with Android 14.\n- Apple - Using the CrossPlatformValidation (or AppleValidator), receipts will now be validated if their certificate chain is encoded in SHA-256 instead of SHA-1. Old receipts encoded in SHA-1 will still be validated. See [Apple Technical Note](https://developer.apple.com/documentation/technotes/tn3138-handling-app-store-receipt-signing-certificate-changes)."
+    "changelog": "### Fixed\n- GooglePlay - Fixed errors related to `CloneReference` on Unity Engine 2021.1.\n\n### Removed\n- Removed unnecessary Android dependency, `androidx.activity:activity-compose:1.3.1`, which could cause conflicts with other plugins."
   },
-  "version": "4.9.4",
+  "version": "4.12.1-pre.1",
   "description": "IMPORTANT UPGRADE NOTES:\n\nIf updating from Unity IAP (com.unity.purchasing + the Asset Store plugin) versions 2.x to version 3.x, complete the following actions in order to resolve compilation errors:\n 1. Move IAPProductCatalog.json and BillingMode.json\n\tFROM: Assets/Plugins/UnityPurchasing/Resources/\n\tTO: Assets/Resources/.\n 2. Move AppleTangle.cs and GooglePlayTangle.cs\n\tFROM: Assets/Plugins/UnityPurchasing/generated\n\tTO: Assets/Scripts/UnityPurchasing/generated.\n 3. Remove all remaining Asset Store plugin folders and files in Assets/Plugins/UnityPurchasing from your project.\n\nPACKAGE DESCRIPTION:\n\nWith Unity IAP, setting up in-app purchases for your game across multiple app stores has never been easier.\n\nThis package provides:\n\n ▪ One common API to access all stores for free so you can fully understand and optimize your in-game economy\n ▪ Automatic coupling with Unity Analytics to enable monitoring and decision-making based on trends in your revenue and purchase data across multiple platforms\n ▪ Support for iOS, Mac, tvOS, Google Play, Windows, and Amazon app stores(*).\n ▪ Support to work with the Unity Distribution Portal to synchronize catalogs and transactions with other app stores\n ▪ Client-side receipt validation for Apple App Store and Google Play\n\nAfter installing this package, open the Services Window to enable In-App Purchasing to use these features.",
   "dependencies": {
     "com.unity.ugui": "1.0.0",
-    "com.unity.modules.unityanalytics": "1.0.0",
     "com.unity.modules.unitywebrequest": "1.0.0",
     "com.unity.modules.jsonserialize": "1.0.0",
     "com.unity.modules.androidjni": "1.0.0",
-    "com.unity.services.core": "1.8.1"
+    "com.unity.services.core": "1.12.5"
   },
   "keywords": [
     "purchasing",
@@ -35,16 +34,16 @@
   "license": "Unity Companion Package License v1.0",
   "hideInEditor": false,
   "relatedPackages": {
-    "com.unity.purchasing.tests": "4.9.4"
+    "com.unity.purchasing.tests": "4.12.1-pre.1"
   },
   "upmCi": {
-    "footprint": "19e0452c9372b862949f9f812aa23ed31b53a489"
+    "footprint": "8e7c3e1f483ff409f9d6e9a422a61958a1fc729d"
   },
-  "documentationUrl": "https://docs.unity3d.com/Packages/com.unity.purchasing@4.9/manual/index.html",
+  "documentationUrl": "https://docs.unity3d.com/Packages/com.unity.purchasing@4.12/manual/index.html",
   "repository": {
     "url": "https://github.cds.internal.unity3d.com/unity/com.unity.purchasing.git",
     "type": "git",
-    "revision": "68f2d826211743b93100781be51c9209ee1377be"
+    "revision": "ed4505208f3bcbcf72a12da60e5d7eec5af8e9e5"
   },
   "samples": [
     {
@@ -146,11 +145,6 @@
       "displayName": "Google Play Store - 02 Restoring Transactions",
       "description": "This sample showcases how to use the Google Play Store extensions to restore transactions. This allows users to be granted Non-Consumable and Subscription products they already own after reinstalling the application.",
       "path": "Samples~/Google Play Store - 02 RestoringTransactions"
-    },
-    {
-      "displayName": "Google Play Store - 03 Confirming Subscription Price Change",
-      "description": "This sample showcases how to use the Google Play Store extensions to confirm subscription price changes.",
-      "path": "Samples~/Google Play Store - 03 ConfirmingSubscriptionPriceChange"
     },
     {
       "displayName": "Google Play Store - 04 Handling Deferred Purchases",

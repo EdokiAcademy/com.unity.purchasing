@@ -59,8 +59,9 @@ namespace UnityEngine.Purchasing
                 return new CoreAnalyticsAdapter(AnalyticsService.Instance, logger);
 #endif
             }
-            catch (ServicesInitializationException)
+            catch (ServicesInitializationException ex)
             {
+                Debug.Log("Unity Purchasing: Failed to initialize Unity Analytics. " + ex.Message + " Disabling analytics.");
                 return new EmptyAnalyticsAdapter();
             }
 #endif
@@ -99,7 +100,7 @@ namespace UnityEngine.Purchasing
 
             var transactionLog = new TransactionLog(logger, persistentDatapath);
             var manager = new PurchasingManager(transactionLog, logger, builder.factory.service,
-                builder.factory.storeName, unityServicesInitializationChecker);
+                builder.factory.storeName, unityServicesInitializationChecker, builder.logUnavailableProducts);
 
             var analyticsClient = new AnalyticsClient(ugsAnalytics, legacyAnalytics);
 

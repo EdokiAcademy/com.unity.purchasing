@@ -3,6 +3,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine.Purchasing.Interfaces;
+using UnityEngine.Purchasing.MiniJSON;
 using UnityEngine.Purchasing.Utils;
 
 namespace UnityEngine.Purchasing.Models
@@ -13,7 +14,7 @@ namespace UnityEngine.Purchasing.Models
     /// </summary>
     class GooglePurchase : IGooglePurchase
     {
-        public IAndroidJavaObjectWrapper javaPurchase { get; }
+        public bool isAcknowledged { get; }
         public int purchaseState { get; }
         public List<string> skus { get; }
         public string orderId { get; }
@@ -21,40 +22,38 @@ namespace UnityEngine.Purchasing.Models
         public string signature { get; }
         public string originalJson { get; }
         public string purchaseToken { get; }
+        public string? obfuscatedAccountId { get; }
+        public string obfuscatedProfileId { get; }
 
         public string? sku => skus.FirstOrDefault();
 
-        internal GooglePurchase(IAndroidJavaObjectWrapper purchase, IEnumerable<IAndroidJavaObjectWrapper> skuDetails)
+        internal GooglePurchase(AndroidJavaObject purchase, IEnumerable<AndroidJavaObject> productDetailsEnum)
         {
-            javaPurchase = purchase;
+            using var skusList = purchase.Call<AndroidJavaObject>("getProducts");
+
+            isAcknowledged = purchase.Call<bool>("isAcknowledged");
             purchaseState = purchase.Call<int>("getPurchaseState");
-            skus = purchase.Call<AndroidJavaObject>("getSkus").Enumerate<string>().ToList();
+            skus = skusList.Enumerate<string>().ToList();
             orderId = purchase.Call<string>("getOrderId");
             originalJson = purchase.Call<string>("getOriginalJson");
             signature = purchase.Call<string>("getSignature");
             purchaseToken = purchase.Call<string>("getPurchaseToken");
+            var accountIdentifiers = purchase.Call<AndroidJavaObject>("getAccountIdentifiers");
+            obfuscatedAccountId = accountIdentifiers.Call<string>("getObfuscatedAccountId");
+            obfuscatedProfileId = accountIdentifiers.Call<string>("getObfuscatedProfileId");
 
-            var skuDetailsJson = skuDetails.Select(skuDetail => skuDetail.Call<string>("getOriginalJson")).ToList();
+            var productDetailsJson = productDetailsEnum.Select(productDetails => ProductDetailsConverter.BuildProductDescription(productDetails).metadata.GetGoogleProductMetadata().originalJson).ToList();
             receipt = GoogleReceiptEncoder.EncodeReceipt(
                 originalJson,
                 signature,
-                skuDetailsJson
+                productDetailsJson
             );
         }
 
-        public virtual bool IsAcknowledged()
-        {
-            return javaPurchase != null && javaPurchase.Call<bool>("isAcknowledged");
-        }
+        public virtual bool IsAcknowledged() => isAcknowledged;
 
-        public virtual bool IsPurchased()
-        {
-            return javaPurchase != null && purchaseState == GooglePurchaseStateEnum.Purchased();
-        }
+        public virtual bool IsPurchased() => purchaseState == GooglePurchaseStateEnum.Purchased();
 
-        public virtual bool IsPending()
-        {
-            return javaPurchase != null && purchaseState == GooglePurchaseStateEnum.Pending();
-        }
+        public virtual bool IsPending() => purchaseState == GooglePurchaseStateEnum.Pending();
     }
 }

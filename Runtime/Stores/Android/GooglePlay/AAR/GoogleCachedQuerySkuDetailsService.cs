@@ -3,33 +3,41 @@ using System.Linq;
 
 namespace UnityEngine.Purchasing
 {
-    class GoogleCachedQuerySkuDetailsService : IGoogleCachedQuerySkuDetailsService
+    class GoogleCachedQueryProductDetailsService : IGoogleCachedQueryProductDetailsService
     {
-        readonly Dictionary<string, AndroidJavaObject> m_CachedQueriedSkus = new Dictionary<string, AndroidJavaObject>();
+        readonly Dictionary<string, AndroidJavaObject> m_CachedQueriedProductDetails = new Dictionary<string, AndroidJavaObject>();
 
-        public IEnumerable<AndroidJavaObject> GetCachedQueriedSkus()
+        ~GoogleCachedQueryProductDetailsService()
         {
-            return m_CachedQueriedSkus.Values;
+            foreach (var cachedQueriedProductDetails in m_CachedQueriedProductDetails)
+            {
+                cachedQueriedProductDetails.Value?.Dispose();
+            }
         }
 
-        AndroidJavaObject GetCachedQueriedSku(string sku)
+        public IEnumerable<AndroidJavaObject> GetCachedQueriedProducts()
         {
-            return m_CachedQueriedSkus[sku];
+            return m_CachedQueriedProductDetails.Values;
         }
 
-        IEnumerable<AndroidJavaObject> GetCachedQueriedSkus(IEnumerable<string> skus)
+        AndroidJavaObject GetCachedQueriedProductDetails(string productId)
         {
-            return skus.Select(GetCachedQueriedSku);
+            return m_CachedQueriedProductDetails[productId];
         }
 
-        public IEnumerable<AndroidJavaObject> GetCachedQueriedSkus(IEnumerable<ProductDefinition> products)
+        IEnumerable<AndroidJavaObject> GetCachedQueriedProductDetails(IEnumerable<string> productIds)
         {
-            return GetCachedQueriedSkus(products.Select(product => product.storeSpecificId));
+            return productIds.Select(GetCachedQueriedProductDetails);
         }
 
-        bool Contains(string sku)
+        public IEnumerable<AndroidJavaObject> GetCachedQueriedProductDetails(IEnumerable<ProductDefinition> products)
         {
-            return m_CachedQueriedSkus.ContainsKey(sku);
+            return GetCachedQueriedProductDetails(products.Select(product => product.storeSpecificId).ToList());
+        }
+
+        bool Contains(string productId)
+        {
+            return m_CachedQueriedProductDetails.ContainsKey(productId);
         }
 
         public bool Contains(ProductDefinition products)
@@ -37,12 +45,16 @@ namespace UnityEngine.Purchasing
             return Contains(products.storeSpecificId);
         }
 
-        public void AddCachedQueriedSkus(IEnumerable<AndroidJavaObject> queriedSkus)
+        public void AddCachedQueriedProductDetails(IEnumerable<AndroidJavaObject> queriedProducts)
         {
-            foreach (var queriedSkuDetails in queriedSkus)
+            foreach (var queriedProductDetails in queriedProducts)
             {
-                var queriedSku = queriedSkuDetails.Call<string>("getSku");
-                m_CachedQueriedSkus[queriedSku] = queriedSkuDetails;
+                var queriedProductId = queriedProductDetails.Call<string>("getProductId");
+#if UNITY_2021_2_OR_NEWER
+                m_CachedQueriedProductDetails[queriedProductId] = queriedProductDetails.CloneReference();
+#else
+                m_CachedQueriedProductDetails[queriedProductId] = queriedProductDetails;
+#endif
             }
         }
     }

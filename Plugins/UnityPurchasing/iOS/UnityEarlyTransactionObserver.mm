@@ -1,3 +1,4 @@
+#if !MAC_APPSTORE
 #import "UnityEarlyTransactionObserver.h"
 #import "UnityPurchasing.h"
 
@@ -144,3 +145,4 @@ extern "C"
 ///////////////////////////////////// Edoki custom change end here /////////////////////////////////////
 
 @end
+#endif
