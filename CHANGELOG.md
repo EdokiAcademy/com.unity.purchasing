@@ -1,4 +1,31 @@
 # Changelog
+## [4.12.2] - 2024-07-17
+### Fixed
+- GooglePlay - Fixed `Product.receipt`'s `price_amount_micros` returning a string instead of a long.
+
+## [4.12.1] - 2024-07-11
+### Changed
+- Apple - The change where `Product.appleProductIsRestored` was no longer sent to `ProcessPurchase` has been reverted.
+
+### Fixed
+- GooglePlay - Fixed an issue where a warning was output in the logs when retrieving purchases.
+
+## [4.12.1-pre.4] - 2024-07-02
+### Fixed
+- GooglePlay - Fixed an issue that happens on Windows when disabling the IAP Dependencies.
+- GooglePlay - Fixed an `InvalidOperationException` that could occur when obtaining purchases. (Since Unity IAP 4.6.0)
+
+## [4.12.1-pre.3] - 2024-06-26
+### Changed
+- Apple - Retrieved purchases from the store will be considered as `appleProductIsRestored`.
+- Apple - `Product.appleProductIsRestored` will no longer be sent to `ProcessPurchase` since they have already been processed.
+- Apple - The changes above will improve Analytics data by avoiding duplicate purchase events.
+
+### Fixed
+- GooglePlay - Fixed an issue where dependencies were added after dependency resolution happened resulting in an error.
+- GooglePlay - Fixed `Product.receipt`'s `price_amount_micros` returning the price instead of the price in micro-units.
+- GooglePlay - Fixed `NullReferenceException` occurring when retrieving products on Unity Engine 2021.2 and earlier.
+- GooglePlay - Fixed `OnProductReceived` callback not being fired with an invalid ProductID.
 
 ## [4.12.1-pre.1] - 2024-06-06
 ### Fixed
